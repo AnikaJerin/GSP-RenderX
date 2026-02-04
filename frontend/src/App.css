@@ -189,6 +189,18 @@
   cursor: not-allowed;
 }
 
+.button-secondary {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-100);
+  padding: 9px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
 .pill {
   padding: 6px 10px;
   border-radius: 999px;

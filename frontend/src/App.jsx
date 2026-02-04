@@ -7,6 +7,8 @@ import "./App.css";
 
 export default function App() {
   const [gaussianData, setGaussianData] = useState(null);
+  const [selection, setSelection] = useState(null);
+  const [inspectMode, setInspectMode] = useState(false);
 
   const stats = useMemo(() => {
     if (!gaussianData) return null;
@@ -17,7 +19,11 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Viewer data={gaussianData} />
+      <Viewer
+        data={gaussianData}
+        onSelect={setSelection}
+        inspectMode={inspectMode}
+      />
 
       <div className="hud">
         <TopBar stats={stats} />
@@ -30,7 +36,12 @@ export default function App() {
           <div className="hud-spacer" />
 
           <div className="hud-right">
-            <InfoPanel selection={null} data={gaussianData} />
+            <InfoPanel
+              selection={selection}
+              data={gaussianData}
+              inspectMode={inspectMode}
+              onToggleInspect={() => setInspectMode((v) => !v)}
+            />
           </div>
         </div>
       </div>

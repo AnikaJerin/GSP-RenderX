@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import * as THREE from "three";
 // import vert from "../../shaders/gaussian.vert.glsl";
 // import frag from "../../shaders/gaussian.frag.glsl";
@@ -36,7 +36,7 @@ const fragmentShader = `
       if (alpha < 0.02) discard;
   }
 `;
-export default function GaussianRenderer({ data }) {
+export default function GaussianRenderer({ data, onPick, pickData }) {
 
   const geometry = useMemo(() => {
     if (!data || !data.positions || data.positions.length === 0) {
@@ -83,12 +83,51 @@ export default function GaussianRenderer({ data }) {
 
   if (!geometry) return null;
 
+  const handlePointerDown = (event) => {
+    if (!onPick || event.index == null) return;
+    const i = event.index;
+    const p = i * 3;
+    const position = [
+      pickData ? pickData.positions[p] : data.positions[p],
+      pickData ? pickData.positions[p + 1] : data.positions[p + 1],
+      pickData ? pickData.positions[p + 2] : data.positions[p + 2],
+    ];
+    const color = [
+      pickData ? pickData.colors[p] : data.colors[p],
+      pickData ? pickData.colors[p + 1] : data.colors[p + 1],
+      pickData ? pickData.colors[p + 2] : data.colors[p + 2],
+    ];
+    const size = (pickData ? pickData.sizes[i] : data.sizes[i]) / 1000;
+    onPick({ index: i, position, color, size });
+  };
+
   return (
-    <points
-      geometry={geometry}
-      material={material}
-    />
+    <>
+      <points geometry={geometry} material={material} />
+      {pickData && onPick && <PickPoints data={pickData} onPick={handlePointerDown} />}
+    </>
   );
+}
+
+function PickPoints({ data, onPick }) {
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(data.positions, 3));
+    return geo;
+  }, [data]);
+
+  const material = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        size: 0.02,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    []
+  );
+
+  return <points geometry={geometry} material={material} onPointerDown={onPick} />;
 }
 
 

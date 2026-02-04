@@ -1,6 +1,11 @@
 import React from "react";
 
-export default function InfoPanel({ selection, data }) {
+export default function InfoPanel({
+  selection,
+  data,
+  inspectMode,
+  onToggleInspect,
+}) {
   const count = data?.count || (data?.positions ? data.positions.length / 3 : 0);
 
   return (
@@ -11,6 +16,10 @@ export default function InfoPanel({ selection, data }) {
           ? `${Intl.NumberFormat().format(count)} active splats`
           : "Upload a model to begin."}
       </div>
+
+      <button className="button-secondary" onClick={onToggleInspect}>
+        {inspectMode ? "Exit Inspect Mode" : "Enable Inspect Mode"}
+      </button>
 
       <div className="meta-grid">
         <div className="meta-item">
@@ -46,7 +55,7 @@ export default function InfoPanel({ selection, data }) {
       </div>
 
       <div className="panel-callout">
-        Next: attach metadata labels to edge clusters and parts.
+        Tip: Inspect mode enables point picking without slowing rotation.
       </div>
     </div>
   );

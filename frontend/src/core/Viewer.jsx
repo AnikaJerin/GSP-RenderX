@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
@@ -32,9 +32,59 @@ function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
   return null;
 }
 
+function RaycastConfig() {
+  const { raycaster } = useThree();
+  React.useEffect(() => {
+    raycaster.params.Points.threshold = 0.15;
+  }, [raycaster]);
+  return null;
+}
 
-export default function Viewer({ data }) {
+function decimateData(data, maxPoints) {
+  if (!data || !data.positions) return data;
+  const count = data.count || data.positions.length / 3;
+  if (!maxPoints || count <= maxPoints) return data;
+
+  const step = Math.ceil(count / maxPoints);
+  const newCount = Math.floor(count / step);
+
+  const positions = new Float32Array(newCount * 3);
+  const normals = new Float32Array(newCount * 3);
+  const colors = new Uint8Array(newCount * 3);
+  const sizes = new Uint16Array(newCount);
+
+  let j = 0;
+  for (let i = 0; i < count && j < newCount; i += step) {
+    const p = i * 3;
+    const q = j * 3;
+    positions[q] = data.positions[p];
+    positions[q + 1] = data.positions[p + 1];
+    positions[q + 2] = data.positions[p + 2];
+    normals[q] = data.normals[p];
+    normals[q + 1] = data.normals[p + 1];
+    normals[q + 2] = data.normals[p + 2];
+    colors[q] = data.colors[p];
+    colors[q + 1] = data.colors[p + 1];
+    colors[q + 2] = data.colors[p + 2];
+    sizes[j] = data.sizes[i];
+    j += 1;
+  }
+
+  return {
+    positions,
+    normals,
+    colors,
+    sizes,
+    count: newCount,
+  };
+}
+
+export default function Viewer({ data, onSelect, inspectMode }) {
   const controlsRef = useRef(null);
+  const pickData = useMemo(
+    () => (inspectMode ? decimateData(data, 120000) : null),
+    [data, inspectMode]
+  );
 
   return (
     <>
@@ -43,7 +93,14 @@ export default function Viewer({ data }) {
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} />
 
-        {data && <GaussianRenderer data={data} />}
+        <RaycastConfig />
+        {data && (
+          <GaussianRenderer
+            data={data}
+            onPick={inspectMode ? onSelect : null}
+            pickData={pickData}
+          />
+        )}
         {data && (
           <CameraFitter
             bboxMin={data.bboxMin}
