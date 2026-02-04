@@ -18,6 +18,7 @@ def convert_mesh_to_gaussians(
         mesh, samples, edge_angle_threshold=edge_angle, edge_oversample=edge_oversample
     )
 
+
     os.makedirs(STATIC_DIR, exist_ok=True)
     out_name = f"{uuid.uuid4().hex}.gsp"
     out_path = os.path.join(STATIC_DIR, out_name)

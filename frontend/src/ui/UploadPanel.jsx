@@ -13,7 +13,7 @@ export default function UploadPanel({ onFileUpload }) {
     }
   
     const formData = new FormData();
-    formData.append("file", selectedFile); // MUST be actual File
+    formData.append("file", selectedFile); 
 
     setLoading(true);
     try {
@@ -23,7 +23,7 @@ export default function UploadPanel({ onFileUpload }) {
       });
       const res = await fetch(`http://127.0.0.1:8000/convert?${params.toString()}`, {
         method: "POST",
-        body: formData, // DO NOT set headers
+        body: formData, 
       });
 
       if (!res.ok) {
