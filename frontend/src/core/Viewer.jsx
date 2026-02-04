@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
+import BackgroundGrid from "./BackgroundGrid";
 
 function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
   const { camera } = useThree();
@@ -19,7 +20,7 @@ function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
       max[1] - min[1],
       max[2] - min[2]
     );
-    const distance = size * 1.8 + 0.5;
+    const distance = size * 1.1 + 0.3;
     camera.position.set(center[0] + distance, center[1] + distance, center[2] + distance);
     camera.near = Math.max(0.01, distance / 100);
     camera.far = distance * 10;
@@ -81,10 +82,20 @@ function decimateData(data, maxPoints) {
 
 export default function Viewer({ data, onSelect, inspectMode }) {
   const controlsRef = useRef(null);
+  const bboxSize = useMemo(() => {
+    if (!data?.bboxMin || !data?.bboxMax) return null;
+    return Math.max(
+      data.bboxMax[0] - data.bboxMin[0],
+      data.bboxMax[1] - data.bboxMin[1],
+      data.bboxMax[2] - data.bboxMin[2]
+    );
+  }, [data]);
+
   const [drawBudget, setDrawBudget] = useState(200000);
   const [renderData, setRenderData] = useState(null);
   const lastAdjustRef = useRef(0);
   const fpsSamples = useRef([]);
+  const [edgeFillBoost, setEdgeFillBoost] = useState(1.0);
   const pickData = useMemo(
     () => (inspectMode ? decimateData(data, 80000) : null),
     [data, inspectMode]
@@ -134,8 +145,12 @@ export default function Viewer({ data, onSelect, inspectMode }) {
 
   return (
     <>
-      <Canvas style={{ width: "100%", height: "100%", touchAction: "none" }}>
-        <color attach="background" args={["#0a0a0a"]} />
+      <Canvas
+        dpr={[1, 2]}
+        style={{ width: "100%", height: "100%", touchAction: "none" }}
+      >
+        <BackgroundGrid />
+        <color attach="background" args={["#0d1014"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} />
 
@@ -145,7 +160,8 @@ export default function Viewer({ data, onSelect, inspectMode }) {
             data={renderData}
             onPick={inspectMode ? onSelect : null}
             pickData={pickData}
-            enableSort
+            enableSort={false}
+            edgeFillBoost={edgeFillBoost}
           />
         )}
         {data && (
@@ -164,6 +180,14 @@ export default function Viewer({ data, onSelect, inspectMode }) {
           enableDamping
           dampingFactor={0.08}
           zoomSpeed={0.9}
+          minDistance={bboxSize ? bboxSize * 0.35 : undefined}
+          maxDistance={bboxSize ? bboxSize * 8.0 : undefined}
+          onChange={() => {
+            if (!bboxSize || !controlsRef.current) return;
+            const dist = controlsRef.current.getDistance();
+            const t = Math.min(1.0, Math.max(0.0, (dist - bboxSize * 0.6) / (bboxSize * 2.2)));
+            setEdgeFillBoost(1.7 - t * 0.8);
+          }}
         />
       </Canvas>
     </>

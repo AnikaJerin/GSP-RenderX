@@ -3,19 +3,22 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: radial-gradient(1200px 800px at 20% 10%, rgba(76, 233, 168, 0.12), transparent 60%),
-    radial-gradient(900px 700px at 80% 20%, rgba(99, 173, 255, 0.14), transparent 55%),
-    linear-gradient(160deg, var(--ink-900), var(--ink-950));
+  background:
+    radial-gradient(900px 650px at 18% 12%, rgba(99, 173, 255, 0.18), transparent 58%),
+    radial-gradient(1000px 700px at 85% 15%, rgba(76, 233, 168, 0.16), transparent 60%),
+    radial-gradient(800px 600px at 50% 80%, rgba(255, 199, 112, 0.08), transparent 55%),
+    linear-gradient(160deg, #0b1015 0%, #06080b 65%, #040506 100%);
 }
 
 .app-shell::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(transparent 92%, rgba(255, 255, 255, 0.04) 93%),
-    linear-gradient(90deg, transparent 92%, rgba(255, 255, 255, 0.03) 93%);
-  background-size: 36px 36px;
-  opacity: 0.35;
+  background-image:
+    linear-gradient(transparent 92%, rgba(255, 255, 255, 0.05) 93%),
+    linear-gradient(90deg, transparent 92%, rgba(255, 255, 255, 0.04) 93%);
+  background-size: 40px 40px;
+  opacity: 0.28;
   pointer-events: none;
 }
 

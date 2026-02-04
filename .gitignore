@@ -23,6 +23,7 @@ TestResults.xml
 # Virtual Environments
 backend/gsp-render-venv/
 backend/uploads/
+backend/static/
 venv/
 .venv/
 env/
