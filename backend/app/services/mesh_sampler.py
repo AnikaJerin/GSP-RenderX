@@ -75,9 +75,10 @@ def sample_mesh_surface(mesh, n_points=50000, edge_angle_threshold=35, edge_over
     # ---------------------------
     # 5️⃣ Assign Gaussian Sizes
     # Smaller splats on edges = sharper look
+    # Add mild size variation for edge-aware kernel
     # ---------------------------
-    surface_sizes = np.full(len(surface_pts), 0.015)
-    edge_sizes = np.full(len(edge_pts), 0.006)
+    surface_sizes = np.full(len(surface_pts), 0.014)
+    edge_sizes = np.full(len(edge_pts), 0.0045)
     sizes = np.concatenate([surface_sizes, edge_sizes])
     
 
