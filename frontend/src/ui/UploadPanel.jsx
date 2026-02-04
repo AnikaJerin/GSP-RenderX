@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { loadGSP } from "../core/loaders/GSPLoader";
+import { loadGSPProgressive } from "../core/loaders/GSPLoader";
 
 export default function UploadPanel({ onFileUpload }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -38,10 +38,13 @@ export default function UploadPanel({ onFileUpload }) {
         return;
       }
 
-      const gsp = await loadGSP(`http://127.0.0.1:8000${result.gsp_url}`);
-      if (onFileUpload) {
-        onFileUpload(gsp);
-      }
+      const gsp = await loadGSPProgressive(`http://127.0.0.1:8000${result.gsp_url}`, {
+        chunkPoints: 120000,
+        onProgress: (partial) => {
+          if (onFileUpload) onFileUpload(partial);
+        },
+      });
+      if (onFileUpload) onFileUpload(gsp);
     } catch (err) {
       console.error(err);
       alert(err.message || "Upload failed");

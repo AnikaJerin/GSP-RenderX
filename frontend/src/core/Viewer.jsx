@@ -82,7 +82,7 @@ function decimateData(data, maxPoints) {
 export default function Viewer({ data, onSelect, inspectMode }) {
   const controlsRef = useRef(null);
   const pickData = useMemo(
-    () => (inspectMode ? decimateData(data, 120000) : null),
+    () => (inspectMode ? decimateData(data, 80000) : null),
     [data, inspectMode]
   );
 

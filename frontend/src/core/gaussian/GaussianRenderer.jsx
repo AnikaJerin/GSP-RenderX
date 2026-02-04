@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import * as THREE from "three";
 // import vert from "../../shaders/gaussian.vert.glsl";
 // import frag from "../../shaders/gaussian.frag.glsl";
@@ -65,6 +65,12 @@ export default function GaussianRenderer({ data, onPick, pickData }) {
     geo.computeBoundingSphere();
     return geo;
   }, [data]);
+
+  useEffect(() => {
+    if (!geometry) return;
+    const count = data?.activeCount ?? data?.count ?? 0;
+    geometry.setDrawRange(0, count);
+  }, [geometry, data]);
   
 
   const material = useMemo(
