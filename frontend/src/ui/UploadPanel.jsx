@@ -3,7 +3,7 @@ import { loadGSP } from "../core/loaders/GSPLoader";
 
 export default function UploadPanel({ onFileUpload }) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [targetSplats, setTargetSplats] = useState(500000);
+  const [targetSplats, setTargetSplats] = useState(150000);
   const [edgeAngle, setEdgeAngle] = useState(35);
   const [loading, setLoading] = useState(false);
   const handleUpload = async () => {
@@ -53,54 +53,56 @@ export default function UploadPanel({ onFileUpload }) {
   
 
   return (
-    <div style={{
-      position: "absolute",
-      top: 20,
-      right: 20,
-      background: "#111",
-      padding: "12px",
-      borderRadius: "8px",
-      color: "white",
-      fontFamily: "monospace"
-    }}>
-      <input
-        type="file"
-        accept=".obj,.stl,.ply,.glb,.gltf,.zip"
-        onChange={(e) => setSelectedFile(e.target.files[0])}
-      />
+    <div className="panel panel-glass upload-panel">
+      <div className="panel-title">Upload + Synthesize</div>
+      <div className="panel-sub">
+        Drop a mesh or archive. The engine will generate edge-aware splats in real time.
+      </div>
 
-      <div style={{ marginTop: "8px" }}>
-        <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>
+      <label className="file-drop">
+        <input
+          type="file"
+          accept=".obj,.stl,.ply,.glb,.gltf,.zip"
+          onChange={(e) => setSelectedFile(e.target.files[0])}
+        />
+        <div className="file-meta">
+          <div className="file-title">
+            {selectedFile ? selectedFile.name : "Choose file"}
+          </div>
+          <div className="file-sub">STL, OBJ, GLB, PLY, or ZIP</div>
+        </div>
+      </label>
+
+      <div className="control-row">
+        <label>
           Target splats
+          <input
+            type="number"
+            min="50000"
+            max="2000000"
+            step="50000"
+            value={targetSplats}
+            onChange={(e) => setTargetSplats(Number(e.target.value))}
+          />
         </label>
-        <input
-          type="number"
-          min="50000"
-          max="2000000"
-          step="50000"
-          value={targetSplats}
-          onChange={(e) => setTargetSplats(Number(e.target.value))}
-          style={{ width: "100%" }}
-        />
       </div>
 
-      <div style={{ marginTop: "8px" }}>
-        <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>
+      <div className="control-row">
+        <label>
           Edge angle (deg)
+          <input
+            type="number"
+            min="5"
+            max="80"
+            step="1"
+            value={edgeAngle}
+            onChange={(e) => setEdgeAngle(Number(e.target.value))}
+          />
         </label>
-        <input
-          type="number"
-          min="5"
-          max="80"
-          step="1"
-          value={edgeAngle}
-          onChange={(e) => setEdgeAngle(Number(e.target.value))}
-          style={{ width: "100%" }}
-        />
       </div>
 
-      <button onClick={handleUpload} style={{ marginTop: "8px" }}>
-        {loading ? "Processing..." : "Convert to GSP"}
+      <button className="button-primary" onClick={handleUpload} disabled={loading}>
+        {loading ? "Synthesizing..." : "Convert to GSP"}
       </button>
     </div>
   );

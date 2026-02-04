@@ -24,26 +24,29 @@ export async function loadGSP(url) {
     dv.getFloat32(28, true),
   ];
   let offset = 32;
+  const positionsBytes = count * 3 * 4;
+  const normalsBytes = count * 3 * 4;
+  const colorsBytes = count * 3;
+  const sizesBytes = count * 2;
 
-  const positions = new Float32Array(count * 3);
-  for (let i = 0; i < positions.length; i++, offset += 4) {
-    positions[i] = dv.getFloat32(offset, true);
-  }
+  const positions = new Float32Array(buffer, offset, count * 3);
+  offset += positionsBytes;
 
-  const normals = new Float32Array(count * 3);
-  for (let i = 0; i < normals.length; i++, offset += 4) {
-    normals[i] = dv.getFloat32(offset, true);
-  }
+  const normals = new Float32Array(buffer, offset, count * 3);
+  offset += normalsBytes;
 
-  const colors = new Uint8Array(count * 3);
-  for (let i = 0; i < colors.length; i++, offset += 1) {
-    colors[i] = dv.getUint8(offset);
-  }
+  const colors = new Uint8Array(buffer, offset, count * 3);
+  offset += colorsBytes;
 
-  const sizes = new Uint16Array(count);
-  for (let i = 0; i < sizes.length; i++, offset += 2) {
-    sizes[i] = dv.getUint16(offset, true);
+  let sizes;
+  if (offset % 2 === 0) {
+    sizes = new Uint16Array(buffer, offset, count);
+  } else {
+    // Fallback: copy into aligned buffer
+    const aligned = buffer.slice(offset, offset + sizesBytes);
+    sizes = new Uint16Array(aligned, 0, count);
   }
+  offset += sizesBytes;
 
   return { positions, normals, colors, sizes, bboxMin, bboxMax, count };
 }

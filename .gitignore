@@ -22,6 +22,7 @@ rad.json
 TestResults.xml
 # Virtual Environments
 backend/gsp-render-venv/
+backend/uploads/
 venv/
 .venv/
 env/

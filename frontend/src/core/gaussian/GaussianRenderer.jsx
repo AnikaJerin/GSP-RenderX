@@ -83,7 +83,12 @@ export default function GaussianRenderer({ data }) {
 
   if (!geometry) return null;
 
-  return <points geometry={geometry} material={material} frustumCulled={false} />;
+  return (
+    <points
+      geometry={geometry}
+      material={material}
+    />
+  );
 }
 
 

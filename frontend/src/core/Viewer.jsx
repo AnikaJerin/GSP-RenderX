@@ -1,8 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
-import UploadPanel from "../ui/UploadPanel";
 
 function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
   const { camera } = useThree();
@@ -33,30 +32,35 @@ function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
   return null;
 }
 
-export default function Viewer() {
-  const [gaussianData, setGaussianData] = useState(null);
+
+export default function Viewer({ data }) {
   const controlsRef = useRef(null);
 
   return (
     <>
-      <Canvas style={{ width: "100%", height: "100%" }}>
+      <Canvas style={{ width: "100%", height: "100%", touchAction: "none" }}>
         <color attach="background" args={["#0a0a0a"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} />
 
-        {gaussianData && <GaussianRenderer data={gaussianData} />}
-        {gaussianData && (
+        {data && <GaussianRenderer data={data} />}
+        {data && (
           <CameraFitter
-            bboxMin={gaussianData.bboxMin}
-            bboxMax={gaussianData.bboxMax}
+            bboxMin={data.bboxMin}
+            bboxMax={data.bboxMax}
             controlsRef={controlsRef}
           />
         )}
-        <OrbitControls ref={controlsRef} makeDefault />
+        <OrbitControls
+          ref={controlsRef}
+          makeDefault
+          enableZoom
+          enablePan
+          enableDamping
+          dampingFactor={0.08}
+          zoomSpeed={0.9}
+        />
       </Canvas>
-
-      {/* Upload panel overlays UI */}
-      <UploadPanel onFileUpload={setGaussianData} />
     </>
   );
 }
