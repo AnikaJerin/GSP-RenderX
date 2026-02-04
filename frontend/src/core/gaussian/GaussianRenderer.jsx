@@ -26,7 +26,7 @@ const fragmentShader = `
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = dot(coord, coord);
 
-      float alpha = exp(-20.0 * dist);
+      float alpha = exp(-60.0 * dist);
 
       vec3 lightDir = normalize(vec3(0.5, 0.8, 1.0));
       float diff = max(dot(normalize(vNormal), lightDir), 0.2);
@@ -39,48 +39,51 @@ const fragmentShader = `
 export default function GaussianRenderer({ data }) {
 
   const geometry = useMemo(() => {
-    if (!data) return null;
-
+    if (!data || !data.positions || data.positions.length === 0) {
+      return null;
+    }
+  
     const geo = new THREE.BufferGeometry();
-    // geo.setAttribute("position", new THREE.BufferAttribute(data.positions, 3));
-    // geo.setAttribute("normal", new THREE.BufferAttribute(data.normals, 3));
+  
+    geo.setAttribute("position", new THREE.BufferAttribute(data.positions, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(data.normals, 3));
+  
+    // Uint8 → Float32
+    const colorFloat = new Float32Array(data.colors.length);
+    for (let i = 0; i < data.colors.length; i++) {
+      colorFloat[i] = data.colors[i] / 255;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colorFloat, 3));
+  
+    // Uint16 → Float32
+    const sizeFloat = new Float32Array(data.sizes.length);
+    for (let i = 0; i < data.sizes.length; i++) {
+      sizeFloat[i] = data.sizes[i] / 1000;
+    }
+    geo.setAttribute("size", new THREE.BufferAttribute(sizeFloat, 1));
 
-    // // Convert Uint8 → Float32 (0–1)
-    // const colorFloat = new Float32Array(data.colors.length);
-    // for (let i = 0; i < data.colors.length; i++) {
-    //   colorFloat[i] = data.colors[i] / 255;
-    // }
-    // geo.setAttribute("color", new THREE.BufferAttribute(colorFloat, 3));
-
-    // // Convert Uint16 → Float32
-    // const sizeFloat = new Float32Array(data.sizes.length);
-    // for (let i = 0; i < data.sizes.length; i++) {
-    //   sizeFloat[i] = data.sizes[i] / 1000;
-    // }
-    // geo.setAttribute("size", new THREE.BufferAttribute(sizeFloat, 1));
-
-
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(data.positions.flat(), 3));
-    geo.setAttribute("color", new THREE.Float32BufferAttribute(data.colors.flat(), 3));
-    geo.setAttribute("size", new THREE.Float32BufferAttribute(data.sizes.flat(), 1));
-    geo.setAttribute("normal", new THREE.Float32BufferAttribute(data.normals.flat(), 3));
+    geo.computeBoundingSphere();
     return geo;
   }, [data]);
+  
 
-  const material = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader,
-      fragmentShader,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexColors: true, // ✅ ADD THIS
-    // blending: THREE.AdditiveBlending,
-  }), []);
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+        vertexColors: true,
+      }),
+    []
+  );
 
   if (!geometry) return null;
 
-  return <points geometry={geometry} material={material} />;
+  return <points geometry={geometry} material={material} frustumCulled={false} />;
 }
 
 

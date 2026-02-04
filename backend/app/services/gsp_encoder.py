@@ -16,9 +16,10 @@ def write_gsp(positions, normals, colors, sizes, filepath):
     with open(filepath, "wb") as f:
         # Header
         f.write(b"GSP1")
-        f.write(struct.pack("I", count))
-        f.write(struct.pack("3f", *bbox_min))
-        f.write(struct.pack("3f", *bbox_max))
+        f.write(struct.pack("<I", count))
+        f.write(struct.pack("<3f", *bbox_min))
+        f.write(struct.pack("<3f", *bbox_max))
+
 
         # Data blocks
         f.write(positions.tobytes())
