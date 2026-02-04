@@ -7,6 +7,26 @@ export default function InfoPanel({
   onToggleInspect,
 }) {
   const count = data?.count || (data?.positions ? data.positions.length / 3 : 0);
+  const bboxMin = data?.bboxMin;
+  const bboxMax = data?.bboxMax;
+  const center = bboxMin && bboxMax
+    ? [
+        (bboxMin[0] + bboxMax[0]) / 2,
+        (bboxMin[1] + bboxMax[1]) / 2,
+        (bboxMin[2] + bboxMax[2]) / 2,
+      ]
+    : null;
+
+  let partLabel = "--";
+  let partDesc = "--";
+  if (selection && center) {
+    const [x, y, z] = selection.position;
+    const lr = x >= center[0] ? "Right" : "Left";
+    const ud = y >= center[1] ? "Upper" : "Lower";
+    const fb = z >= center[2] ? "Front" : "Back";
+    partLabel = `${ud}-${lr}-${fb}`;
+    partDesc = `Spatial cluster derived from bbox octant (${ud}, ${lr}, ${fb}).`;
+  }
 
   return (
     <div className="panel panel-glass info-panel">
@@ -27,6 +47,10 @@ export default function InfoPanel({
           <div className="meta-value">
             {selection ? `#${selection.index}` : "None"}
           </div>
+        </div>
+        <div className="meta-item">
+          <div className="meta-label">Part ID</div>
+          <div className="meta-value">{partLabel}</div>
         </div>
         <div className="meta-item">
           <div className="meta-label">Position</div>
@@ -51,6 +75,10 @@ export default function InfoPanel({
               ? `rgb(${selection.color[0]}, ${selection.color[1]}, ${selection.color[2]})`
               : "--"}
           </div>
+        </div>
+        <div className="meta-item">
+          <div className="meta-label">Description</div>
+          <div className="meta-value">{partDesc}</div>
         </div>
       </div>
 

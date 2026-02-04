@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useFrame, useThree } from "@react-three/fiber";
 // import vert from "../../shaders/gaussian.vert.glsl";
 // import frag from "../../shaders/gaussian.frag.glsl";
 const vertexShader = `
@@ -7,10 +8,12 @@ const vertexShader = `
 
   varying vec3 vColor;
   varying vec3 vNormal;
+  varying float vSize;
 
   void main() {
       vColor = color;     // provided by Three.js
       vNormal = normal;   // provided by Three.js
+      vSize = size;
 
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_PointSize = size * (300.0 / -mvPosition.z);
@@ -21,12 +24,14 @@ const vertexShader = `
 const fragmentShader = `
   varying vec3 vColor;
   varying vec3 vNormal;
+  varying float vSize;
 
   void main() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = dot(coord, coord);
 
-      float alpha = exp(-60.0 * dist);
+      float edgeBoost = mix(1.0, 1.6, clamp(0.012 / (vSize + 0.0001), 0.0, 1.0));
+      float alpha = exp(-60.0 * dist) * edgeBoost;
 
       vec3 lightDir = normalize(vec3(0.5, 0.8, 1.0));
       float diff = max(dot(normalize(vNormal), lightDir), 0.2);
@@ -36,7 +41,7 @@ const fragmentShader = `
       if (alpha < 0.02) discard;
   }
 `;
-export default function GaussianRenderer({ data, onPick, pickData }) {
+export default function GaussianRenderer({ data, onPick, pickData, enableSort }) {
 
   const geometry = useMemo(() => {
     if (!data || !data.positions || data.positions.length === 0) {
@@ -106,6 +111,39 @@ export default function GaussianRenderer({ data, onPick, pickData }) {
     const size = (pickData ? pickData.sizes[i] : data.sizes[i]) / 1000;
     onPick({ index: i, position, color, size });
   };
+
+  const indexRef = useRef(null);
+  const sortThrottle = useRef(0);
+  const { camera } = useThree();
+
+  useFrame(({ clock }) => {
+    if (!enableSort || !geometry) return;
+    const count = geometry.getAttribute("position").count;
+    if (count > 200000) return;
+    if (clock.elapsedTime - sortThrottle.current < 0.5) return;
+    sortThrottle.current = clock.elapsedTime;
+
+    const pos = geometry.getAttribute("position").array;
+    const indices = new Uint32Array(count);
+    const depths = new Float32Array(count);
+
+    const mv = new THREE.Matrix4();
+    mv.multiplyMatrices(camera.matrixWorldInverse, geometry.matrixWorld);
+
+    const v = new THREE.Vector3();
+    for (let i = 0; i < count; i += 1) {
+      const x = pos[i * 3];
+      const y = pos[i * 3 + 1];
+      const z = pos[i * 3 + 2];
+      v.set(x, y, z).applyMatrix4(mv);
+      depths[i] = v.z;
+      indices[i] = i;
+    }
+
+    indices.sort((a, b) => depths[b] - depths[a]);
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    indexRef.current = indices;
+  });
 
   return (
     <>

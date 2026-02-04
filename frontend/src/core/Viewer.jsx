@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
 
@@ -81,10 +81,56 @@ function decimateData(data, maxPoints) {
 
 export default function Viewer({ data, onSelect, inspectMode }) {
   const controlsRef = useRef(null);
+  const [drawBudget, setDrawBudget] = useState(200000);
+  const [renderData, setRenderData] = useState(null);
+  const lastAdjustRef = useRef(0);
+  const fpsSamples = useRef([]);
   const pickData = useMemo(
     () => (inspectMode ? decimateData(data, 80000) : null),
     [data, inspectMode]
   );
+
+  useEffect(() => {
+    if (!data) {
+      setRenderData(null);
+      return;
+    }
+    const activeCount = data.activeCount || data.count || 0;
+    const initial = Math.min(200000, activeCount);
+    setDrawBudget(initial);
+    setRenderData(decimateData(data, initial));
+  }, [data]);
+
+  function AdaptiveBudget() {
+    const { clock } = useThree();
+    useFrame((state, delta) => {
+      if (!data) return;
+      const activeCount = data.activeCount || data.count || 0;
+      const now = clock.elapsedTime;
+
+      fpsSamples.current.push(1 / Math.max(delta, 0.001));
+      if (fpsSamples.current.length > 20) fpsSamples.current.shift();
+
+      if (now - lastAdjustRef.current < 0.5) return;
+      lastAdjustRef.current = now;
+
+      const avgFps =
+        fpsSamples.current.reduce((a, b) => a + b, 0) / fpsSamples.current.length;
+
+      let next = drawBudget;
+      if (avgFps < 45) {
+        next = Math.max(50000, Math.floor(drawBudget * 0.8));
+      } else if (avgFps > 58) {
+        next = Math.min(activeCount, Math.floor(drawBudget * 1.1));
+      }
+
+      if (Math.abs(next - drawBudget) >= 20000) {
+        setDrawBudget(next);
+        setRenderData(decimateData(data, next));
+      }
+    });
+    return null;
+  }
 
   return (
     <>
@@ -94,11 +140,12 @@ export default function Viewer({ data, onSelect, inspectMode }) {
         <directionalLight position={[5, 5, 5]} />
 
         <RaycastConfig />
-        {data && (
+        {renderData && (
           <GaussianRenderer
-            data={data}
+            data={renderData}
             onPick={inspectMode ? onSelect : null}
             pickData={pickData}
+            enableSort
           />
         )}
         {data && (
@@ -108,6 +155,7 @@ export default function Viewer({ data, onSelect, inspectMode }) {
             controlsRef={controlsRef}
           />
         )}
+        <AdaptiveBudget />
         <OrbitControls
           ref={controlsRef}
           makeDefault
