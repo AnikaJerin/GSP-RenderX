@@ -80,7 +80,19 @@ function decimateData(data, maxPoints) {
   };
 }
 
-export default function Viewer({ data, onSelect, inspectMode }) {
+export default function Viewer({
+  data,
+  onSelect,
+  inspectMode,
+  clipEnabled,
+  clipAxis,
+  clipRatio,
+  showFps,
+  onFps,
+  onRenderStats,
+  annotations,
+  showAnnotations,
+}) {
   const controlsRef = useRef(null);
   const bboxSize = useMemo(() => {
     if (!data?.bboxMin || !data?.bboxMax) return null;
@@ -89,7 +101,15 @@ export default function Viewer({ data, onSelect, inspectMode }) {
       data.bboxMax[1] - data.bboxMin[1],
       data.bboxMax[2] - data.bboxMin[2]
     );
-  }, [data]);
+  }, [data, onRenderStats]);
+
+  const clipValue = useMemo(() => {
+    if (!data?.bboxMin || !data?.bboxMax) return 0;
+    const axis = clipAxis;
+    const min = axis === "x" ? data.bboxMin[0] : axis === "y" ? data.bboxMin[1] : data.bboxMin[2];
+    const max = axis === "x" ? data.bboxMax[0] : axis === "y" ? data.bboxMax[1] : data.bboxMax[2];
+    return min + (max - min) * clipRatio;
+  }, [data, clipAxis, clipRatio]);
 
   const [drawBudget, setDrawBudget] = useState(200000);
   const [renderData, setRenderData] = useState(null);
@@ -110,7 +130,15 @@ export default function Viewer({ data, onSelect, inspectMode }) {
     const initial = Math.min(200000, activeCount);
     setDrawBudget(initial);
     setRenderData(decimateData(data, initial));
+    if (onRenderStats) {
+      onRenderStats({
+        total: data.count || activeCount,
+        active: activeCount,
+        rendered: Math.min(initial, activeCount),
+      });
+    }
   }, [data]);
+
 
   function AdaptiveBudget() {
     const { clock } = useThree();
@@ -137,7 +165,35 @@ export default function Viewer({ data, onSelect, inspectMode }) {
 
       if (Math.abs(next - drawBudget) >= 20000) {
         setDrawBudget(next);
-        setRenderData(decimateData(data, next));
+        const nextData = decimateData(data, next);
+        setRenderData(nextData);
+        if (onRenderStats) {
+          const activeCount = data.activeCount || data.count || 0;
+          onRenderStats({
+            total: data.count || activeCount,
+            active: activeCount,
+            rendered: nextData?.count || 0,
+          });
+        }
+      }
+    });
+    return null;
+  }
+
+  function FpsOverlay() {
+    useFrame((state, delta) => {
+      if (!showFps) return;
+      const current = 1 / Math.max(delta, 0.001);
+      const last = fpsSamples.current.length
+        ? fpsSamples.current[fpsSamples.current.length - 1]
+        : current;
+      const smoothed = last * 0.85 + current * 0.15;
+      fpsSamples.current.push(smoothed);
+      if (fpsSamples.current.length > 60) fpsSamples.current.shift();
+      if (fpsSamples.current.length >= 10 && onFps) {
+        const avg =
+          fpsSamples.current.reduce((a, b) => a + b, 0) / fpsSamples.current.length;
+        onFps(avg);
       }
     });
     return null;
@@ -162,6 +218,11 @@ export default function Viewer({ data, onSelect, inspectMode }) {
             pickData={pickData}
             enableSort={false}
             edgeFillBoost={edgeFillBoost}
+            clipEnabled={clipEnabled}
+            clipAxis={clipAxis}
+            clipValue={clipValue}
+            annotations={annotations}
+            showAnnotations={showAnnotations}
           />
         )}
         {data && (
@@ -172,6 +233,7 @@ export default function Viewer({ data, onSelect, inspectMode }) {
           />
         )}
         <AdaptiveBudget />
+        <FpsOverlay />
         <OrbitControls
           ref={controlsRef}
           makeDefault

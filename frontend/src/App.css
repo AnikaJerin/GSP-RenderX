@@ -30,6 +30,7 @@
   gap: 16px;
   padding: 20px;
   pointer-events: none;
+  min-height: 0;
 }
 
 .hud-columns {
@@ -38,6 +39,7 @@
   gap: 16px;
   flex: 1;
   align-items: start;
+  min-height: 0;
 }
 
 .hud-left,
@@ -46,6 +48,7 @@
   flex-direction: column;
   gap: 16px;
   pointer-events: auto;
+  min-height: 0;
 }
 
 .hud-spacer {
@@ -143,6 +146,15 @@
   font-size: 13px;
 }
 
+.control-row select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--ink-100);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .file-drop {
   display: flex;
   gap: 12px;
@@ -204,6 +216,17 @@
   margin-bottom: 14px;
 }
 
+.annotation-label {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(20, 30, 35, 0.8);
+  border: 1px solid rgba(120, 255, 220, 0.4);
+  color: rgba(190, 255, 235, 0.95);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .pill {
   padding: 6px 10px;
   border-radius: 999px;
@@ -254,6 +277,24 @@
   background: rgba(99, 173, 255, 0.1);
   color: var(--ink-200);
   font-size: 12px;
+}
+
+.info-panel {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
+.info-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.info-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+}
+
+.info-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 @media (max-width: 1100px) {

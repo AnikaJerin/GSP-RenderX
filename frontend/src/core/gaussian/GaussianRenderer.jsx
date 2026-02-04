@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { Html } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 // import vert from "../../shaders/gaussian.vert.glsl";
 // import frag from "../../shaders/gaussian.frag.glsl";
@@ -9,6 +10,7 @@ const vertexShader = `
   varying vec3 vColor;
   varying vec3 vNormal;
   varying vec3 vViewDir;
+  varying vec3 vWorldPos;
   varying float vSize;
   varying float vDepth;
   uniform float uPointScale;
@@ -21,6 +23,9 @@ const vertexShader = `
   uniform float uEdgeBoost;
   uniform float uDensityBoost;
   uniform float uSizeRef;
+  uniform float uClipEnabled;
+  uniform float uClipAxis;
+  uniform float uClipValue;
 
   void main() {
       vColor = color;     // provided by Three.js
@@ -30,6 +35,7 @@ const vertexShader = `
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       vDepth = -mvPosition.z;
       vViewDir = normalize(-mvPosition.xyz);
+      vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
       float screenScale = uViewportHeight / 800.0;
       float viewDepth = max(-mvPosition.z, 0.001);
       float densityScale = mix(1.0, uDensityBoost, clamp(1.0 - (size / uSizeRef), 0.0, 1.0));
@@ -47,12 +53,20 @@ const fragmentShader = `
   varying vec3 vViewDir;
   varying float vSize;
   varying float vDepth;
+  varying vec3 vWorldPos;
   uniform float uNear;
   uniform float uFar;
   uniform float uFill;
   uniform float uEdgeBoost;
+  uniform float uClipEnabled;
+  uniform float uClipAxis;
+  uniform float uClipValue;
 
   void main() {
+      if (uClipEnabled > 0.5) {
+        float v = uClipAxis < 0.5 ? vWorldPos.x : (uClipAxis < 1.5 ? vWorldPos.y : vWorldPos.z);
+        if (v > uClipValue) discard;
+      }
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = dot(coord, coord);
 
@@ -73,7 +87,18 @@ const fragmentShader = `
       if (alpha < 0.004) discard;
   }
 `;
-export default function GaussianRenderer({ data, onPick, pickData, enableSort, edgeFillBoost = 1.0 }) {
+export default function GaussianRenderer({
+  data,
+  onPick,
+  pickData,
+  enableSort,
+  edgeFillBoost = 1.0,
+  clipEnabled = false,
+  clipAxis = "y",
+  clipValue = 0,
+  annotations = [],
+  showAnnotations = true,
+}) {
   const pointsRef = useRef(null);
 
   const geometry = useMemo(() => {
@@ -132,6 +157,9 @@ export default function GaussianRenderer({ data, onPick, pickData, enableSort, e
           uEdgeBoost: { value: 2.6 },
           uDensityBoost: { value: 2.1 },
           uSizeRef: { value: 0.02 },
+          uClipEnabled: { value: 0.0 },
+          uClipAxis: { value: 1.0 },
+          uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
         },
@@ -160,6 +188,9 @@ export default function GaussianRenderer({ data, onPick, pickData, enableSort, e
           uEdgeBoost: { value: 2.3 },
           uDensityBoost: { value: 1.4 },
           uSizeRef: { value: 0.02 },
+          uClipEnabled: { value: 0.0 },
+          uClipAxis: { value: 1.0 },
+          uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
         },
@@ -188,6 +219,9 @@ export default function GaussianRenderer({ data, onPick, pickData, enableSort, e
           uEdgeBoost: { value: 3.0 },
           uDensityBoost: { value: 1.1 },
           uSizeRef: { value: 0.02 },
+          uClipEnabled: { value: 0.0 },
+          uClipAxis: { value: 1.0 },
+          uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
         },
@@ -229,7 +263,25 @@ export default function GaussianRenderer({ data, onPick, pickData, enableSort, e
     });
     materialFill.uniforms.uFill.value = 3.2 * edgeFillBoost;
     materialEdge.uniforms.uEdgeBoost.value = 3.0 * edgeFillBoost;
-  }, [materialFill, materialDetail, materialEdge, size.height, camera.near, camera.far, edgeFillBoost]);
+    const axisValue = clipAxis === "x" ? 0.0 : clipAxis === "y" ? 1.0 : 2.0;
+    const clipOn = clipEnabled ? 1.0 : 0.0;
+    [materialFill, materialDetail, materialEdge].forEach((mat) => {
+      mat.uniforms.uClipEnabled.value = clipOn;
+      mat.uniforms.uClipAxis.value = axisValue;
+      mat.uniforms.uClipValue.value = clipValue;
+    });
+  }, [
+    materialFill,
+    materialDetail,
+    materialEdge,
+    size.height,
+    camera.near,
+    camera.far,
+    edgeFillBoost,
+    clipEnabled,
+    clipAxis,
+    clipValue,
+  ]);
 
   useFrame(({ clock }) => {
     if (!enableSort || !geometry) return;
@@ -267,11 +319,54 @@ export default function GaussianRenderer({ data, onPick, pickData, enableSort, e
       <points ref={pointsRef} geometry={geometry} material={materialFill} renderOrder={0} />
       <points geometry={geometry} material={materialDetail} renderOrder={1} />
       <points geometry={geometry} material={materialEdge} renderOrder={2} />
+      {showAnnotations && annotations && annotations.length > 0 && (
+        <AnnotationPoints annotations={annotations} />
+      )}
+      {showAnnotations && annotations && annotations.length > 0 && (
+        <AnnotationLabels annotations={annotations} />
+      )}
       {pickData && onPick && <PickPoints data={pickData} onPick={handlePointerDown} />}
     </>
   );
 }
 
+function AnnotationPoints({ annotations }) {
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(annotations.length * 3);
+    annotations.forEach((ann, i) => {
+      positions[i * 3] = ann.position[0];
+      positions[i * 3 + 1] = ann.position[1];
+      positions[i * 3 + 2] = ann.position[2];
+    });
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, [annotations]);
+
+  const material = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        size: 0.03,
+        color: new THREE.Color(0.15, 1.0, 0.85),
+        depthWrite: false,
+      }),
+    []
+  );
+
+  return <points geometry={geometry} material={material} renderOrder={3} />;
+}
+
+function AnnotationLabels({ annotations }) {
+  return (
+    <>
+      {annotations.map((ann) => (
+        <Html key={ann.id} position={ann.position} center>
+          <div className="annotation-label">{ann.label}</div>
+        </Html>
+      ))}
+    </>
+  );
+}
 function PickPoints({ data, onPick }) {
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
