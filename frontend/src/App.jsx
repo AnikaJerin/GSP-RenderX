@@ -3,6 +3,13 @@ import Viewer from "./core/Viewer";
 import UploadPanel from "./ui/UploadPanel";
 import InfoPanel from "./ui/InfoPanel";
 import TopBar from "./ui/TopBar";
+import {
+  buildSceneFromGaussianData,
+  createEmptyScene,
+  enableDynamics,
+  updateRenderingSettings,
+  updateDynamicsSettings,
+} from "./core/scene/SceneModel";
 import "./App.css";
 
 export default function App() {
@@ -25,6 +32,8 @@ export default function App() {
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [reconstructedSurface, setReconstructedSurface] = useState(true);
   const [surfaceColor, setSurfaceColor] = useState("#eae7e2");
+  const [sceneEngineEnabled, setSceneEngineEnabled] = useState(false);
+  const [scene, setScene] = useState(() => createEmptyScene());
 
   const stats = useMemo(() => {
     if (!gaussianData) return null;
@@ -69,6 +78,8 @@ export default function App() {
         onRenderStats={setRenderStats}
         solidSurface={reconstructedSurface}
         surfaceColor={surfaceColor}
+        sceneEnabled={sceneEngineEnabled}
+        scene={sceneEngineEnabled ? scene : null}
       />
 
       <div className="hud">
@@ -81,6 +92,9 @@ export default function App() {
                 setGaussianData(gsp);
                 setMeshUrl(nextMeshUrl);
                 setMeshType(nextMeshType);
+                if (sceneEngineEnabled) {
+                  setScene(buildSceneFromGaussianData(gsp, nextMeshUrl, nextMeshType));
+                }
               }}
             />
           </div>
@@ -121,6 +135,32 @@ export default function App() {
               onToggleSolidSurface={() => setReconstructedSurface((v) => !v)}
               surfaceColor={surfaceColor}
               onChangeSurfaceColor={setSurfaceColor}
+              sceneEngineEnabled={sceneEngineEnabled}
+              onToggleSceneEngine={() => {
+                setSceneEngineEnabled((prev) => {
+                  const next = !prev;
+                  if (next && gaussianData) {
+                    setScene(buildSceneFromGaussianData(gaussianData, meshUrl, meshType));
+                  }
+                  if (!next) {
+                    setScene(createEmptyScene());
+                  }
+                  return next;
+                });
+              }}
+              sceneRendering={scene?.settings?.rendering}
+              sceneDynamics={scene?.settings?.dynamics}
+              onUpdateSceneRendering={(partial) => {
+                setScene((prev) => updateRenderingSettings(prev, partial));
+              }}
+              onToggleSceneDynamics={() => {
+                setScene((prev) =>
+                  enableDynamics(prev, !prev.settings?.dynamics?.enabled)
+                );
+              }}
+              onUpdateSceneDynamics={(partial) => {
+                setScene((prev) => updateDynamicsSettings(prev, partial));
+              }}
             />
           </div>
         </div>

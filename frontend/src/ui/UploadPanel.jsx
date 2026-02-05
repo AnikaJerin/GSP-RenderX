@@ -6,6 +6,9 @@ export default function UploadPanel({ onFileUpload }) {
   const [targetSplats, setTargetSplats] = useState(150000);
   const [edgeAngle, setEdgeAngle] = useState(35);
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imageLoadingFace, setImageLoadingFace] = useState(false);
+  const [imageLoadingMedical, setImageLoadingMedical] = useState(false);
   const handleUpload = async () => {
     if (!selectedFile) {
       alert("Please select a file first");
@@ -64,8 +67,77 @@ export default function UploadPanel({ onFileUpload }) {
       setLoading(false);
     }
   };
-   
-  
+
+  const handleImageReconstruct = async (mode) => {
+    if (!imageFile) {
+      alert("Please select an image first");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const setLoading =
+      mode === "fastavatar" ? setImageLoadingFace : setImageLoadingMedical;
+
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        target_splats: String(Math.min(Math.max(targetSplats, 1000), 500000)),
+      });
+      const endpoint =
+        mode === "fastavatar"
+          ? "reconstruct_image_fastavatar"
+          : "reconstruct_image_pixel3dmm";
+      const res = await fetch(
+        `http://127.0.0.1:8000/${endpoint}?${params.toString()}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Image reconstruction failed");
+      }
+      const result = await res.json();
+      console.log("Image reconstruction returned:", result);
+
+      if (!result.gsp_url) {
+        console.error("Backend did not return gsp_url");
+        return;
+      }
+
+      const gsp = await loadGSPProgressive(
+        `http://127.0.0.1:8000${result.gsp_url}`,
+        {
+          chunkPoints: 120000,
+          onProgress: (partial) => {
+            if (onFileUpload) {
+              onFileUpload({
+                gsp: partial,
+                meshUrl: null,
+                meshType: null,
+              });
+            }
+          },
+        }
+      );
+      if (onFileUpload) {
+        onFileUpload({
+          gsp,
+          meshUrl: null,
+          meshType: null,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Image reconstruction failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="panel panel-glass upload-panel">
@@ -118,6 +190,37 @@ export default function UploadPanel({ onFileUpload }) {
 
       <button className="button-primary" onClick={handleUpload} disabled={loading}>
         {loading ? "Synthesizing..." : "Convert to GSP"}
+      </button>
+
+      <hr className="panel-separator" />
+      <div className="panel-sub">
+        Or reconstruct from a single reference image.
+      </div>
+      <div className="control-row">
+        <label>
+          Reference image
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImageFile(e.target.files[0])}
+          />
+        </label>
+      </div>
+      <button
+        className="button-secondary"
+        onClick={() => handleImageReconstruct("fastavatar")}
+        disabled={imageLoadingFace}
+      >
+        {imageLoadingFace ? "Reconstructing (Face)..." : "Reconstruct Face (FastAvatar)"}
+      </button>
+      <button
+        className="button-secondary"
+        onClick={() => handleImageReconstruct("pixel3dmm")}
+        disabled={imageLoadingMedical}
+      >
+        {imageLoadingMedical
+          ? "Reconstructing (Medical)..."
+          : "Reconstruct Medical (Pixel3DMM)"}
       </button>
     </div>
   );

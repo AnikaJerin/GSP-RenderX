@@ -61,6 +61,8 @@ const fragmentShader = `
   uniform float uClipEnabled;
   uniform float uClipAxis;
   uniform float uClipValue;
+  // Global opacity used for high-level Splat Weight control.
+  uniform float uGlobalOpacity;
 
   void main() {
       if (uClipEnabled > 0.5) {
@@ -76,6 +78,7 @@ const fragmentShader = `
       float facing = abs(dot(normalize(vNormal), normalize(vViewDir)));
       float silhouette = pow(1.0 - facing, 2.1) * uEdgeBoost;
       float alpha = exp(-sharp * dist) * edgeBoost * depthBoost * uFill + silhouette * 0.45;
+      alpha *= uGlobalOpacity;
 
       vec3 lightDir = normalize(vec3(0.35, 0.85, 0.35));
       float diff = max(dot(normalize(vNormal), lightDir), 0.18);
@@ -98,6 +101,7 @@ export default function GaussianRenderer({
   clipValue = 0,
   annotations = [],
   showAnnotations = true,
+  globalOpacity = 1.0,
 }) {
   const pointsRef = useRef(null);
 
@@ -162,6 +166,7 @@ export default function GaussianRenderer({
           uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
+          uGlobalOpacity: { value: 1.0 },
         },
       }),
     []
@@ -193,6 +198,7 @@ export default function GaussianRenderer({
           uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
+          uGlobalOpacity: { value: 1.0 },
         },
       }),
     []
@@ -224,6 +230,7 @@ export default function GaussianRenderer({
           uClipValue: { value: 0.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
+          uGlobalOpacity: { value: 1.0 },
         },
       }),
     []
@@ -260,6 +267,7 @@ export default function GaussianRenderer({
       mat.uniforms.uViewportHeight.value = size.height;
       mat.uniforms.uNear.value = camera.near;
       mat.uniforms.uFar.value = camera.far;
+      mat.uniforms.uGlobalOpacity.value = globalOpacity;
     });
     materialFill.uniforms.uFill.value = 3.2 * edgeFillBoost;
     materialEdge.uniforms.uEdgeBoost.value = 3.0 * edgeFillBoost;
@@ -281,6 +289,7 @@ export default function GaussianRenderer({
     clipEnabled,
     clipAxis,
     clipValue,
+    globalOpacity,
   ]);
 
   useFrame(({ clock }) => {

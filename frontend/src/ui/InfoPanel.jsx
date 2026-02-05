@@ -30,6 +30,13 @@ export default function InfoPanel({
   onToggleSolidSurface,
   surfaceColor,
   onChangeSurfaceColor,
+  sceneEngineEnabled,
+  onToggleSceneEngine,
+  sceneRendering,
+  sceneDynamics,
+  onUpdateSceneRendering,
+  onToggleSceneDynamics,
+  onUpdateSceneDynamics,
 }) {
   const count = data?.count || (data?.positions ? data.positions.length / 3 : 0);
   const bboxMin = data?.bboxMin;
@@ -149,6 +156,80 @@ export default function InfoPanel({
       <button className="button-secondary" onClick={onToggleFps}>
         {showFps ? "Hide FPS" : "Show FPS"}
       </button>
+
+      <button className="button-secondary" onClick={onToggleSceneEngine}>
+        {sceneEngineEnabled ? "Disable Scene Engine" : "Enable Scene Engine"}
+      </button>
+      {sceneEngineEnabled && (
+        <>
+          <div className="control-row">
+            <label>
+              Splat Weight
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={
+                  sceneRendering && sceneRendering.splatVisibility != null
+                    ? sceneRendering.splatVisibility
+                    : 1
+                }
+                onChange={(e) =>
+                  onUpdateSceneRendering({
+                    splatVisibility: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+          <div className="control-row">
+            <label>
+              Mesh Weight
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={
+                  sceneRendering && sceneRendering.meshVisibility != null
+                    ? sceneRendering.meshVisibility
+                    : 1
+                }
+                onChange={(e) =>
+                  onUpdateSceneRendering({
+                    meshVisibility: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+          <button className="button-secondary" onClick={onToggleSceneDynamics}>
+            {sceneDynamics && sceneDynamics.enabled
+              ? "Disable Dynamics"
+              : "Enable Dynamics"}
+          </button>
+          {sceneDynamics && sceneDynamics.enabled && (
+            <div className="control-row">
+              <label>
+                Temporal Time
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="0.01"
+                  value={
+                    sceneDynamics.time != null ? sceneDynamics.time : 0
+                  }
+                  onChange={(e) =>
+                    onUpdateSceneDynamics({ time: Number(e.target.value) })
+                  }
+                />
+              </label>
+            </div>
+          )}
+        </>
+      )}
 
       <div className="meta-grid">
         <div className="meta-item">

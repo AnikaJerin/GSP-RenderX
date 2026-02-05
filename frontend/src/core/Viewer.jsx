@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
 import MeshSurface from "./mesh/MeshSurface";
 import BackgroundGrid from "./BackgroundGrid";
+import { useMemo as useReactMemo } from "react";
 
 function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
   const { camera } = useThree();
@@ -97,6 +98,9 @@ export default function Viewer({
   showAnnotations,
   solidSurface,
   surfaceColor,
+  // Optional Scene Engine integration (kept additive / opt-in).
+  sceneEnabled = false,
+  scene = null,
 }) {
   const controlsRef = useRef(null);
   const bboxSize = useMemo(() => {
@@ -212,6 +216,31 @@ export default function Viewer({
     return null;
   }
 
+  const sceneRenderOverrides = useReactMemo(() => {
+    if (!sceneEnabled || !scene || !scene.settings?.rendering) return null;
+    return scene.settings.rendering;
+  }, [sceneEnabled, scene]);
+
+  // Scene Engine: dynamic transform & simple animation wrapper.
+  function SceneEntityGroup({ children }) {
+    const groupRef = useRef();
+    useFrame((state, delta) => {
+      if (!sceneEnabled || !scene || !scene.settings?.dynamics?.enabled) return;
+      const dyn = scene.settings.dynamics;
+      const tScale = dyn.timeScale || 1.0;
+      const clockT = state.clock.getElapsedTime() * tScale;
+      const t = dyn.time != null ? dyn.time : clockT;
+      if (!groupRef.current) return;
+
+      // Simple demo animation: slow orbit + subtle vertical motion.
+      const orbitSpeed = 0.2;
+      const bounceAmp = 0.08;
+      groupRef.current.rotation.y = t * orbitSpeed;
+      groupRef.current.position.y = Math.sin(t * 1.2) * bounceAmp;
+    });
+    return <group ref={groupRef}>{children}</group>;
+  }
+
   return (
     <>
       <Canvas
@@ -224,27 +253,49 @@ export default function Viewer({
         <directionalLight position={[5, 5, 5]} />
 
         <RaycastConfig />
+
         {renderData && (!solidSurface || !meshReady) && (
-          <GaussianRenderer
-            data={renderData}
-            onPick={inspectMode ? onSelect : null}
-            pickData={pickData}
-            enableSort={false}
-            edgeFillBoost={edgeFillBoost}
-            clipEnabled={clipEnabled}
-            clipAxis={clipAxis}
-            clipValue={clipValue}
-            annotations={annotations}
-            showAnnotations={showAnnotations}
-          />
+          <SceneEntityGroup>
+            <GaussianRenderer
+              data={renderData}
+              onPick={inspectMode ? onSelect : null}
+              pickData={pickData}
+              enableSort={false}
+              edgeFillBoost={
+                (sceneRenderOverrides?.gaussianEdgeBoost != null
+                  ? edgeFillBoost * sceneRenderOverrides.gaussianEdgeBoost
+                  : edgeFillBoost) *
+                (sceneRenderOverrides?.splatVisibility != null
+                  ? sceneRenderOverrides.splatVisibility
+                  : 1.0)
+              }
+              clipEnabled={clipEnabled}
+              clipAxis={clipAxis}
+              clipValue={clipValue}
+              annotations={annotations}
+              showAnnotations={showAnnotations}
+              globalOpacity={
+                sceneRenderOverrides?.splatVisibility != null
+                  ? sceneRenderOverrides.splatVisibility
+                  : 1.0
+              }
+            />
+          </SceneEntityGroup>
         )}
         {meshUrl && solidSurface && (
-          <MeshSurface
-            url={meshUrl}
-            type={meshType}
-            onLoaded={() => setMeshReady(true)}
-            color={surfaceColor}
-          />
+          <SceneEntityGroup>
+            <MeshSurface
+              url={meshUrl}
+              type={meshType}
+              onLoaded={() => setMeshReady(true)}
+              color={surfaceColor}
+              opacity={
+                sceneRenderOverrides?.meshVisibility != null
+                  ? sceneRenderOverrides.meshVisibility
+                  : 1.0
+              }
+            />
+          </SceneEntityGroup>
         )}
         {data && (
           <CameraFitter
