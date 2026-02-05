@@ -26,6 +26,10 @@ export default function InfoPanel({
   onClearAnnotations,
   showAnnotations,
   onToggleShowAnnotations,
+  solidSurface,
+  onToggleSolidSurface,
+  surfaceColor,
+  onChangeSurfaceColor,
 }) {
   const count = data?.count || (data?.positions ? data.positions.length / 3 : 0);
   const bboxMin = data?.bboxMin;
@@ -66,20 +70,37 @@ export default function InfoPanel({
           ? `${Intl.NumberFormat().format(count)} active splats`
           : "Upload a model to begin."}
       </div>
-
+      <div className="panel-callout">
+        Tip: Turn off the Object Reconstruction to see the effect of Inspect mode.
+      </div>
+      <br/>
       <button className="button-secondary" onClick={onToggleInspect}>
         {inspectMode ? "Exit Inspect Mode" : "Enable Inspect Mode"}
       </button>
       <button className="button-secondary" onClick={onToggleMeasure}>
         {measureMode ? "Exit Measure Mode" : "Measure Distance"}
       </button>
-      <button className="button-secondary" onClick={onToggleAnnotation}>
+      {/* <button className="button-secondary" onClick={onToggleAnnotation}>
         {annotationMode ? "Annotation Mode: ON" : "Annotation Mode: OFF"}
-      </button>
-      <button className="button-secondary" onClick={onToggleShowAnnotations}>
+      </button> */}
+      {/* <button className="button-secondary" onClick={onToggleShowAnnotations}>
         {showAnnotations ? "Hide Annotations" : "Show Annotations"}
+      </button> */}
+      <button className="button-secondary" onClick={onToggleSolidSurface}>
+        {solidSurface ? "Reconstructed Object: ON" : "Reconstructed Object: OFF"}
       </button>
       <div className="control-row">
+        <label>
+          Surface Color
+          <input
+            type="color"
+            value={surfaceColor}
+            onChange={(e) => onChangeSurfaceColor(e.target.value)}
+          />
+        </label>
+      </div>
+      <br/>
+      {/* <div className="control-row">
         <label>
           Annotation Label
           <input
@@ -88,10 +109,10 @@ export default function InfoPanel({
             onChange={(e) => onChangeAnnotationLabel(e.target.value)}
           />
         </label>
-      </div>
-      <button className="button-secondary" onClick={onClearAnnotations}>
+      </div> */}
+      {/* <button className="button-secondary" onClick={onClearAnnotations}>
         Clear Annotations
-      </button>
+      </button> */}
       <button className="button-secondary" onClick={onToggleClip}>
         {clipEnabled ? "Disable Section" : "Enable Section"}
       </button>

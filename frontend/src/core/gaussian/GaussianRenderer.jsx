@@ -77,9 +77,9 @@ const fragmentShader = `
       float silhouette = pow(1.0 - facing, 2.1) * uEdgeBoost;
       float alpha = exp(-sharp * dist) * edgeBoost * depthBoost * uFill + silhouette * 0.45;
 
-      vec3 lightDir = normalize(vec3(0.35, 0.8, 0.45));
-      float diff = max(dot(normalize(vNormal), lightDir), 0.2);
-      vec3 ambient = vec3(0.45);
+      vec3 lightDir = normalize(vec3(0.35, 0.85, 0.35));
+      float diff = max(dot(normalize(vNormal), lightDir), 0.18);
+      vec3 ambient = vec3(0.55);
       vec3 colorOut = vColor * (diff + ambient);
 
       gl_FragColor = vec4(colorOut, alpha);

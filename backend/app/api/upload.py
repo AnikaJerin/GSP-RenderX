@@ -9,6 +9,8 @@ router = APIRouter()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+STATIC_DIR = "static"
+os.makedirs(STATIC_DIR, exist_ok=True)
 
 SUPPORTED_EXTS = {".stl", ".obj", ".ply", ".glb", ".gltf"}
 
@@ -52,6 +54,11 @@ async def convert_model(
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
         mesh_path = file_path
 
+    mesh_ext = os.path.splitext(mesh_path)[1].lower()
+    mesh_out = f"{uuid.uuid4().hex}{mesh_ext}"
+    mesh_out_path = os.path.join(STATIC_DIR, mesh_out)
+    shutil.copyfile(mesh_path, mesh_out_path)
+
     gaussian_data = convert_mesh_to_gaussians(
         mesh_path,
         samples=target_splats,
@@ -59,4 +66,8 @@ async def convert_model(
         edge_oversample=edge_oversample,
     )
 
-    return gaussian_data
+    return {
+        **gaussian_data,
+        "mesh_url": f"/static/{mesh_out}",
+        "mesh_type": mesh_ext.replace(".", ""),
+    }

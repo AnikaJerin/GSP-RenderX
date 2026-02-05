@@ -41,10 +41,22 @@ export default function UploadPanel({ onFileUpload }) {
       const gsp = await loadGSPProgressive(`http://127.0.0.1:8000${result.gsp_url}`, {
         chunkPoints: 120000,
         onProgress: (partial) => {
-          if (onFileUpload) onFileUpload(partial);
+          if (onFileUpload) {
+            onFileUpload({
+              gsp: partial,
+              meshUrl: result.mesh_url ? `http://127.0.0.1:8000${result.mesh_url}` : null,
+              meshType: result.mesh_type || null,
+            });
+          }
         },
       });
-      if (onFileUpload) onFileUpload(gsp);
+      if (onFileUpload) {
+        onFileUpload({
+          gsp,
+          meshUrl: result.mesh_url ? `http://127.0.0.1:8000${result.mesh_url}` : null,
+          meshType: result.mesh_type || null,
+        });
+      }
     } catch (err) {
       console.error(err);
       alert(err.message || "Upload failed");

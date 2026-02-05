@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
+import MeshSurface from "./mesh/MeshSurface";
 import BackgroundGrid from "./BackgroundGrid";
 
 function CameraFitter({ bboxMin, bboxMax, controlsRef }) {
@@ -82,6 +83,8 @@ function decimateData(data, maxPoints) {
 
 export default function Viewer({
   data,
+  meshUrl,
+  meshType,
   onSelect,
   inspectMode,
   clipEnabled,
@@ -92,6 +95,8 @@ export default function Viewer({
   onRenderStats,
   annotations,
   showAnnotations,
+  solidSurface,
+  surfaceColor,
 }) {
   const controlsRef = useRef(null);
   const bboxSize = useMemo(() => {
@@ -113,9 +118,11 @@ export default function Viewer({
 
   const [drawBudget, setDrawBudget] = useState(200000);
   const [renderData, setRenderData] = useState(null);
+  const [meshReady, setMeshReady] = useState(false);
   const lastAdjustRef = useRef(0);
   const fpsSamples = useRef([]);
   const [edgeFillBoost, setEdgeFillBoost] = useState(1.0);
+  const stableRef = useRef(0);
   const pickData = useMemo(
     () => (inspectMode ? decimateData(data, 80000) : null),
     [data, inspectMode]
@@ -137,7 +144,7 @@ export default function Viewer({
         rendered: Math.min(initial, activeCount),
       });
     }
-  }, [data]);
+  }, [data, onRenderStats]);
 
 
   function AdaptiveBudget() {
@@ -156,11 +163,17 @@ export default function Viewer({
       const avgFps =
         fpsSamples.current.reduce((a, b) => a + b, 0) / fpsSamples.current.length;
 
+      const maxCap = activeCount;
       let next = drawBudget;
       if (avgFps < 45) {
+        stableRef.current = 0;
         next = Math.max(50000, Math.floor(drawBudget * 0.8));
-      } else if (avgFps > 58) {
-        next = Math.min(activeCount, Math.floor(drawBudget * 1.1));
+      } else {
+        stableRef.current += delta;
+        if (avgFps > 58 && stableRef.current > 2.0) {
+          next = Math.min(maxCap, Math.floor(drawBudget * 1.1));
+          stableRef.current = 0;
+        }
       }
 
       if (Math.abs(next - drawBudget) >= 20000) {
@@ -211,7 +224,7 @@ export default function Viewer({
         <directionalLight position={[5, 5, 5]} />
 
         <RaycastConfig />
-        {renderData && (
+        {renderData && (!solidSurface || !meshReady) && (
           <GaussianRenderer
             data={renderData}
             onPick={inspectMode ? onSelect : null}
@@ -223,6 +236,14 @@ export default function Viewer({
             clipValue={clipValue}
             annotations={annotations}
             showAnnotations={showAnnotations}
+          />
+        )}
+        {meshUrl && solidSurface && (
+          <MeshSurface
+            url={meshUrl}
+            type={meshType}
+            onLoaded={() => setMeshReady(true)}
+            color={surfaceColor}
           />
         )}
         {data && (
@@ -248,7 +269,9 @@ export default function Viewer({
             if (!bboxSize || !controlsRef.current) return;
             const dist = controlsRef.current.getDistance();
             const t = Math.min(1.0, Math.max(0.0, (dist - bboxSize * 0.6) / (bboxSize * 2.2)));
-            setEdgeFillBoost(1.7 - t * 0.8);
+            const base = 1.7;
+            const falloff = 0.8;
+            setEdgeFillBoost(base - t * falloff);
           }}
         />
       </Canvas>

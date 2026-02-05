@@ -7,6 +7,8 @@ import "./App.css";
 
 export default function App() {
   const [gaussianData, setGaussianData] = useState(null);
+  const [meshUrl, setMeshUrl] = useState(null);
+  const [meshType, setMeshType] = useState(null);
   const [selection, setSelection] = useState(null);
   const [inspectMode, setInspectMode] = useState(false);
   const [measureMode, setMeasureMode] = useState(false);
@@ -21,6 +23,8 @@ export default function App() {
   const [annotations, setAnnotations] = useState([]);
   const [annotationLabel, setAnnotationLabel] = useState("Note");
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [reconstructedSurface, setReconstructedSurface] = useState(true);
+  const [surfaceColor, setSurfaceColor] = useState("#eae7e2");
 
   const stats = useMemo(() => {
     if (!gaussianData) return null;
@@ -33,6 +37,8 @@ export default function App() {
     <div className="app-shell">
       <Viewer
         data={gaussianData}
+        meshUrl={meshUrl}
+        meshType={meshType}
         onSelect={(point) => {
           setSelection(point);
           if (measureMode) {
@@ -61,6 +67,8 @@ export default function App() {
         annotations={annotations}
         showAnnotations={showAnnotations}
         onRenderStats={setRenderStats}
+        solidSurface={reconstructedSurface}
+        surfaceColor={surfaceColor}
       />
 
       <div className="hud">
@@ -68,7 +76,13 @@ export default function App() {
 
         <div className="hud-columns">
           <div className="hud-left">
-            <UploadPanel onFileUpload={setGaussianData} />
+            <UploadPanel
+              onFileUpload={({ gsp, meshUrl: nextMeshUrl, meshType: nextMeshType }) => {
+                setGaussianData(gsp);
+                setMeshUrl(nextMeshUrl);
+                setMeshType(nextMeshType);
+              }}
+            />
           </div>
 
           <div className="hud-spacer" />
@@ -103,6 +117,10 @@ export default function App() {
               onClearAnnotations={() => setAnnotations([])}
               showAnnotations={showAnnotations}
               onToggleShowAnnotations={() => setShowAnnotations((v) => !v)}
+              solidSurface={reconstructedSurface}
+              onToggleSolidSurface={() => setReconstructedSurface((v) => !v)}
+              surfaceColor={surfaceColor}
+              onChangeSurfaceColor={setSurfaceColor}
             />
           </div>
         </div>
