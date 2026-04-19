@@ -79,12 +79,21 @@ def evaluate_casewise(
     device: torch.device,
 ) -> dict[str, float]:
     model.eval()
+    torch.cuda.empty_cache() # Clear training leftovers
     reports = []
 
     for sample in tqdm(dataset, leave=False):
-        image = sample["image"][None, ...].to(device)
+        # image shape is likely [C, D, H, W]
+        image = sample["image"][None, ...].to(device) 
+        
         outputs = model(image)
-        seg_prob = torch.sigmoid(outputs["seg_logits"]).squeeze().cpu().numpy()
+        
+        # IMMEDIATELY move to CPU to free up GPU space
+        seg_logits = outputs["seg_logits"].detach().cpu()
+        del outputs # Delete the large dictionary from GPU
+        
+        seg_prob = torch.sigmoid(seg_logits).squeeze().numpy()
+        # seg_prob = torch.sigmoid(outputs["seg_logits"]).squeeze().cpu().numpy()
         pred = (seg_prob > 0.5).astype(np.uint8)
         target = sample["mask"].squeeze().cpu().numpy().astype(np.uint8)
         spacing = tuple(float(x) for x in sample["spacing"].cpu().numpy().tolist())
