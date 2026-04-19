@@ -34,7 +34,9 @@ def run_inference(model: torch.nn.Module, image_np: np.ndarray, device: torch.de
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run TopCoW inference and export a local viewer bundle.")
+    parser = argparse.ArgumentParser(
+        description="Run TopCoW/TopBrain inference and export a local viewer bundle."
+    )
     parser.add_argument("--checkpoint", required=True, help="Path to trained .pt checkpoint")
     parser.add_argument("--image", required=True, help="Path to TopCoW MRA image .nii.gz")
     parser.add_argument("--out", required=True, help="Output .npz path")

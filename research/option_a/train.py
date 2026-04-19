@@ -107,9 +107,11 @@ def save_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.O
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train Option A on TopCoW MRA")
-    parser.add_argument("--data-root", required=True, help="TopCoW root directory")
+    parser = argparse.ArgumentParser(description="Train Option A on TopCoW/TopBrain vessel data")
+    parser.add_argument("--data-root", required=True, help="Dataset root directory")
     parser.add_argument("--output-dir", default="artifacts/option_a", help="Where checkpoints and logs go")
+    parser.add_argument("--dataset", default="topcow", choices=["topcow", "topbrain"])
+    parser.add_argument("--modality", default="mr", choices=["mr", "ct", "cta", "mra"])
     parser.add_argument("--epochs", type=int, default=120)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--lr", type=float, default=2e-4)
@@ -129,12 +131,14 @@ def main():
         split="train",
         patch_size=tuple(args.patch_size),
         use_patches=True,
+        dataset_name=args.dataset,
+        modality=args.modality,
     )
     val_ds = TopCoWMRADataset(
-        args.data_root,
-        split="val",
-        patch_size=tuple(args.patch_size),
-        use_patches=False,
+    args.data_root,
+    split="val",
+    patch_size=tuple(args.patch_size),
+    use_patches=True,
     )
 
     train_loader = DataLoader(

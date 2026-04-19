@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import random
+import re
 
 import nibabel as nib
 import numpy as np
@@ -103,35 +104,150 @@ class TopCoWCase:
     label_path: Path
 
 
+def _candidate_image_dirs(
+    root: Path,
+    dataset_name: str = "topcow",
+    modality: str = "mr",
+) -> list[Path]:
+    modality = modality.lower()
+    dataset_name = dataset_name.lower()
+    names = [
+        "imagesTr",
+        "images",
+        "image",
+        f"imagesTr_{dataset_name}_{modality}",
+        f"imagesTr_{dataset_name}_{'ct' if modality == 'cta' else modality}",
+        "train/images",
+        "training/images",
+        "data/imagesTr",
+    ]
+    dirs = [root / name for name in names if (root / name).exists()]
+    if dirs:
+        return dirs
+    return [root]
+
+
+def _candidate_label_dirs(
+    root: Path,
+    dataset_name: str = "topcow",
+    modality: str = "mr",
+) -> list[Path]:
+    modality = modality.lower()
+    dataset_name = dataset_name.lower()
+    names = [
+        "cow_seg_labelsTr",
+        "labelsTr",
+        "labels",
+        "label",
+        f"labelsTr_{dataset_name}_{modality}",
+        f"labelsTr_{dataset_name}_{'ct' if modality == 'cta' else modality}",
+        "train/labels",
+        "training/labels",
+        "data/labelsTr",
+    ]
+    return [root / name for name in names if (root / name).exists()]
+
+
+def _extract_case_id(path: Path) -> str:
+    stem = path.name.replace(".nii.gz", "").replace(".nii", "")
+
+    if stem.endswith("_0000"):
+        stem = stem[:-5]
+
+    patterns = [
+        r"topbrain_(?:mr|ct|mr_seg|ct_seg)_(\d+)$",
+        r"topcow_(?:mr|mra|ct|cta|mr_seg|mra_seg|ct_seg|cta_seg)_(\d+)$",
+        r"topcow_(\d+)$",
+        r"topbrain_(\d+)$",
+        r".*?(\d+)$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, stem)
+        if match:
+            return match.group(1)
+
+    return stem
+
+
+def _build_label_lookup(label_dirs: list[Path]) -> dict[str, Path]:
+    lookup: dict[str, Path] = {}
+    for label_dir in label_dirs:
+        for label_path in sorted(label_dir.rglob("*.nii.gz")):
+            case_id = _extract_case_id(label_path)
+            lookup[case_id] = label_path
+    return lookup
+
+
 def discover_topcow_cases(
     root: str | Path,
     split: str = "train",
     modality: str = "mr",
+    dataset_name: str = "topcow",
 ) -> list[TopCoWCase]:
     root = Path(root)
-    images_dir = root / "imagesTr"
-    labels_dir = root / "cow_seg_labelsTr"
+    dataset_name = dataset_name.lower()
+    modality = modality.lower()
+    image_dirs = _candidate_image_dirs(root, dataset_name=dataset_name, modality=modality)
+    label_dirs = _candidate_label_dirs(root, dataset_name=dataset_name, modality=modality)
 
-    pattern = f"topcow_{modality}_*_0000.nii.gz"
-    image_paths = sorted(images_dir.glob(pattern))
+    image_patterns = [
+        f"{dataset_name}_{modality}_*_0000.nii.gz",
+        f"{dataset_name}_{modality}_*.nii.gz",
+        f"topcow_{modality}_*_0000.nii.gz",
+        f"topcow_{modality}a_*_0000.nii.gz",
+        f"topbrain_{modality}_*_0000.nii.gz",
+        "topcow_*_0000.nii.gz",
+        "topbrain_*_0000.nii.gz",
+        "*_0000.nii.gz",
+        "*.nii.gz",
+    ]
+
+    image_paths: list[Path] = []
+    for image_dir in image_dirs:
+        for pattern in image_patterns:
+            image_paths.extend(sorted(image_dir.rglob(pattern)))
+
+    # Deduplicate while preserving order.
+    seen = set()
+    deduped: list[Path] = []
+    for path in image_paths:
+        if path not in seen:
+            deduped.append(path)
+            seen.add(path)
+    image_paths = deduped
+
     if not image_paths:
-        raise FileNotFoundError(f"No TopCoW images found in {images_dir} with pattern {pattern}")
+        searched = ", ".join(str(x) for x in image_dirs)
+        raise FileNotFoundError(
+            f"No {dataset_name} images found under {searched}. "
+            f"Tried patterns: {', '.join(image_patterns)}"
+        )
+
+    if not label_dirs:
+        raise FileNotFoundError(
+            f"No label directories found under {root}. "
+            "Expected one of: labelsTr, labels, train/labels, or dataset-specific labelsTr_<dataset>_<modality>"
+        )
+
+    label_lookup = _build_label_lookup(label_dirs)
 
     all_cases: list[TopCoWCase] = []
     for image_path in image_paths:
-        parts = image_path.name.split("_")
-        case_id = parts[2]
-        label_name = image_path.name.replace("_0000.nii.gz", ".nii.gz").replace(
-            f"topcow_{modality}_", f"topcow_{modality}_seg_"
-        )
-        label_path = labels_dir / label_name
-        if not label_path.exists():
-            alt = labels_dir / image_path.name.replace("_0000.nii.gz", ".nii.gz")
-            if alt.exists():
-                label_path = alt
-            else:
-                raise FileNotFoundError(f"Missing label for {image_path.name}")
+        # Skip labels accidentally collected from loose folder layouts.
+        if any(part.lower().startswith("label") for part in image_path.parts):
+            continue
+        case_id = _extract_case_id(image_path)
+        label_path = label_lookup.get(case_id)
+        if label_path is None:
+            continue
         all_cases.append(TopCoWCase(case_id=case_id, image_path=image_path, label_path=label_path))
+
+    if not all_cases:
+        raise FileNotFoundError(
+            f"Found {len(image_paths)} candidate image files under {root}, "
+            "but could not match any to labels. "
+            "Please inspect the folder names and label filenames."
+        )
 
     random.Random(7).shuffle(all_cases)
     n = len(all_cases)
@@ -153,12 +269,21 @@ class TopCoWMRADataset(Dataset):
         split: str = "train",
         patch_size: tuple[int, int, int] = (96, 96, 96),
         use_patches: bool = True,
+        dataset_name: str = "topcow",
+        modality: str = "mr",
     ):
         self.root = Path(root)
         self.split = split
         self.patch_size = patch_size
         self.use_patches = use_patches
-        self.cases = discover_topcow_cases(root, split=split, modality="mr")
+        self.dataset_name = dataset_name
+        self.modality = modality
+        self.cases = discover_topcow_cases(
+            root,
+            split=split,
+            modality=modality,
+            dataset_name=dataset_name,
+        )
 
     def __len__(self) -> int:
         return len(self.cases)

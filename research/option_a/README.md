@@ -34,11 +34,37 @@ pip install -r /content/GSP-RenderX/research/option_a/requirements-colab.txt
 python -m research.option_a.train \
   --data-root "/content/drive/MyDrive/TopCoW" \
   --output-dir "/content/drive/MyDrive/gsp_option_a_runs/run_001" \
+  --dataset topcow \
+  --modality mr \
   --epochs 120 \
   --batch-size 1 \
   --patch-size 96 96 96 \
   --num-workers 2 \
   --device cuda
+```
+
+For your `TopBrain` MR layout:
+
+```bash
+python -m research.option_a.train \
+  --data-root "/content/drive/MyDrive/TopBrain_Data_Release_Batches1n2_081425" \
+  --output-dir "/content/drive/MyDrive/gsp_option_a_runs/topbrain_mr_run_001" \
+  --dataset topbrain \
+  --modality mr \
+  --epochs 120 \
+  --batch-size 1 \
+  --patch-size 96 96 96 \
+  --num-workers 2 \
+  --device cuda
+```
+
+If you want to check discovery before training:
+
+```bash
+python -m research.option_a.inspect_topcow \
+  --data-root "/content/drive/MyDrive/TopBrain_Data_Release_Batches1n2_081425" \
+  --dataset topbrain \
+  --modality mr
 ```
 
 ## Export One Case For Local Viewer
