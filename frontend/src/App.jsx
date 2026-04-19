@@ -16,6 +16,8 @@ export default function App() {
   const [gaussianData, setGaussianData] = useState(null);
   const [meshUrl, setMeshUrl] = useState(null);
   const [meshType, setMeshType] = useState(null);
+  const [assetMeta, setAssetMeta] = useState(null);
+  const [analysisReport, setAnalysisReport] = useState(null);
   const [selection, setSelection] = useState(null);
   const [inspectMode, setInspectMode] = useState(false);
   const [measureMode, setMeasureMode] = useState(false);
@@ -88,13 +90,33 @@ export default function App() {
         <div className="hud-columns">
           <div className="hud-left">
             <UploadPanel
-              onFileUpload={({ gsp, meshUrl: nextMeshUrl, meshType: nextMeshType }) => {
+              onFileUpload={({
+                gsp,
+                meshUrl: nextMeshUrl,
+                meshType: nextMeshType,
+                metadata,
+                analysis,
+              }) => {
                 setGaussianData(gsp);
                 setMeshUrl(nextMeshUrl);
                 setMeshType(nextMeshType);
+                if (metadata) {
+                  setAssetMeta(metadata);
+                }
+                if (analysis) {
+                  setAnalysisReport(analysis);
+                }
                 if (sceneEngineEnabled) {
                   setScene(buildSceneFromGaussianData(gsp, nextMeshUrl, nextMeshType));
                 }
+              }}
+              onVesselAnalyze={(report) => {
+                setAnalysisReport(report);
+                setAssetMeta((prev) => ({
+                  ...(prev || {}),
+                  structural_features: report.structural_features,
+                  learned_vessel_model_state: report.learned_vessel_model_state,
+                }));
               }}
             />
           </div>
@@ -105,6 +127,8 @@ export default function App() {
             <InfoPanel
               selection={selection}
               data={gaussianData}
+              assetMeta={assetMeta}
+              analysisReport={analysisReport}
               inspectMode={inspectMode}
               onToggleInspect={() => setInspectMode((v) => !v)}
               measureMode={measureMode}

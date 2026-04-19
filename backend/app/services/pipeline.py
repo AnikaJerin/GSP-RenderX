@@ -1,6 +1,7 @@
-from .mesh_loader import load_mesh
-from .mesh_sampler import sample_mesh_surface
 from .gsp_encoder import write_gsp
+from .generator_registry import GeneratorContext, get_generator
+from .vessel_centerline import vessel_volume_to_gaussians
+from .vessel_loader import load_vessel_volume
 import os
 import uuid
 
@@ -12,29 +13,66 @@ def convert_mesh_to_gaussians(
     samples=50000,
     edge_angle=35,
     edge_oversample=1.5,
+    generator_name: str = "heuristic_mesh",
 ):
-    mesh = load_mesh(file_path)
-    positions, normals, colors, sizes = sample_mesh_surface(
-        mesh, samples, edge_angle_threshold=edge_angle, edge_oversample=edge_oversample
+    generator = get_generator(generator_name)
+    gaussian_set = generator.generate(
+        GeneratorContext(
+            source_path=file_path,
+            samples=samples,
+            edge_angle=edge_angle,
+            edge_oversample=edge_oversample,
+        )
     )
-
 
     os.makedirs(STATIC_DIR, exist_ok=True)
     out_name = f"{uuid.uuid4().hex}.gsp"
     out_path = os.path.join(STATIC_DIR, out_name)
 
-    write_gsp(positions, normals, colors, sizes, out_path)
+    write_gsp(
+        gaussian_set.positions,
+        gaussian_set.normals,
+        gaussian_set.colors,
+        gaussian_set.sizes,
+        out_path,
+    )
 
     return {
         "gsp_url": f"/static/{out_name}",
-        "count": int(len(positions)),
+        "count": int(len(gaussian_set.positions)),
+        "generator": generator_name,
+        "metadata": gaussian_set.metadata or {},
     }
 
 
+def convert_vessel_volume_to_gaussians(
+    file_path: str,
+    threshold: float = 0.5,
+    max_points: int = 120000,
+):
+    vessel = load_vessel_volume(file_path)
+    gaussian_set, features = vessel_volume_to_gaussians(
+        vessel,
+        threshold=threshold,
+        max_points=max_points,
+    )
 
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    out_name = f"{uuid.uuid4().hex}.gsp"
+    out_path = os.path.join(STATIC_DIR, out_name)
 
-# def convert_mesh_to_gaussians(file_path: str, samples=50000):
-#     mesh = load_mesh(file_path)
-#     positions, normals, colors, sizes = sample_mesh_surface(mesh, samples)
-#     gaussian_data = build_gaussians(positions, normals, colors, sizes)
-#     return gaussian_data
+    write_gsp(
+        gaussian_set.positions,
+        gaussian_set.normals,
+        gaussian_set.colors,
+        gaussian_set.sizes,
+        out_path,
+    )
+
+    return {
+        "gsp_url": f"/static/{out_name}",
+        "count": int(len(gaussian_set.positions)),
+        "generator": "vessel_centerline_proxy",
+        "metadata": gaussian_set.metadata or {},
+        "structural_features": features.as_dict(),
+    }

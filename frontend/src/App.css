@@ -128,6 +128,20 @@
   margin-bottom: 12px;
 }
 
+.panel-section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mint-300);
+  margin-bottom: 10px;
+}
+
+.panel-separator {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 18px 0;
+}
+
 .upload-panel {
   max-height: calc(100vh - 180px);
   overflow-y: auto;
@@ -234,6 +248,27 @@
   margin-bottom: 14px;
 }
 
+.panel-contract {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(99, 173, 255, 0.08);
+  border: 1px solid rgba(99, 173, 255, 0.18);
+  margin-top: 8px;
+}
+
+.panel-contract-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-100);
+  margin-bottom: 8px;
+}
+
+.panel-contract-line {
+  font-size: 12px;
+  color: var(--ink-200);
+  line-height: 1.45;
+}
+
 .annotation-label {
   font-size: 11px;
   padding: 4px 8px;
@@ -295,6 +330,14 @@
   background: rgba(99, 173, 255, 0.1);
   color: var(--ink-200);
   font-size: 12px;
+}
+
+.research-block {
+  margin-top: 18px;
+}
+
+.meta-grid.compact {
+  margin-top: 10px;
 }
 
 .info-panel {

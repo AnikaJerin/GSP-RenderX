@@ -3,6 +3,8 @@ import React from "react";
 export default function InfoPanel({
   selection,
   data,
+  assetMeta,
+  analysisReport,
   inspectMode,
   onToggleInspect,
   measureMode,
@@ -68,6 +70,14 @@ export default function InfoPanel({
             Math.pow(measurePoints[0].position[2] - measurePoints[1].position[2], 2)
         )
       : null;
+
+  const structuralFeatures =
+    assetMeta?.structural_features || analysisReport?.structural_features || null;
+  const sourceDomain = assetMeta?.domain || assetMeta?.source_type || "--";
+  const learnedVesselState =
+    assetMeta?.learned_vessel_model_state ||
+    analysisReport?.learned_vessel_model_state ||
+    null;
 
   return (
     <div className="panel panel-glass info-panel">
@@ -233,6 +243,10 @@ export default function InfoPanel({
 
       <div className="meta-grid">
         <div className="meta-item">
+          <div className="meta-label">Source Domain</div>
+          <div className="meta-value">{sourceDomain}</div>
+        </div>
+        <div className="meta-item">
           <div className="meta-label">Selection</div>
           <div className="meta-value">
             {selection ? `#${selection.index}` : "None"}
@@ -313,6 +327,59 @@ export default function InfoPanel({
           <div className="meta-value">{partDesc}</div>
         </div>
       </div>
+
+      {structuralFeatures && (
+        <div className="research-block">
+          <div className="panel-title">Vessel Research</div>
+          <div className="meta-grid compact">
+            <div className="meta-item">
+              <div className="meta-label">Centerline Voxels</div>
+              <div className="meta-value mono">
+                {structuralFeatures.centerline_voxel_count ?? "--"}
+              </div>
+            </div>
+            <div className="meta-item">
+              <div className="meta-label">Endpoints</div>
+              <div className="meta-value mono">
+                {structuralFeatures.endpoint_count ?? "--"}
+              </div>
+            </div>
+            <div className="meta-item">
+              <div className="meta-label">Branchpoints</div>
+              <div className="meta-value mono">
+                {structuralFeatures.branchpoint_count ?? "--"}
+              </div>
+            </div>
+            <div className="meta-item">
+              <div className="meta-label">Mean Radius</div>
+              <div className="meta-value mono">
+                {structuralFeatures.mean_radius != null
+                  ? Number(structuralFeatures.mean_radius).toFixed(3)
+                  : "--"}
+              </div>
+            </div>
+            <div className="meta-item">
+              <div className="meta-label">Approx Length</div>
+              <div className="meta-value mono">
+                {structuralFeatures.approximate_total_length != null
+                  ? Number(structuralFeatures.approximate_total_length).toFixed(3)
+                  : "--"}
+              </div>
+            </div>
+            <div className="meta-item">
+              <div className="meta-label">Uncertainty Ready</div>
+              <div className="meta-value">
+                {structuralFeatures.uncertainty_ready ? "Yes" : "No"}
+              </div>
+            </div>
+          </div>
+          {learnedVesselState && (
+            <div className="panel-callout">
+              Vessel model state: {learnedVesselState.status}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="panel-callout">
         Tip: Inspect mode enables point picking without slowing rotation.
