@@ -157,8 +157,12 @@ def main():
     history = []
 
     for epoch in range(1, args.epochs + 1):
+        # train_stats = run_epoch(model, train_loader, device, optimizer=optimizer)
+        # val_stats = evaluate_casewise(model, val_ds, device=device)
         train_stats = run_epoch(model, train_loader, device, optimizer=optimizer)
-        val_stats = evaluate_casewise(model, val_ds, device=device)
+        val_stats = {}
+        # scheduler.step()
+
         scheduler.step()
 
         row = {
@@ -171,10 +175,12 @@ def main():
 
         latest_path = out_dir / "latest.pt"
         save_checkpoint(latest_path, model, optimizer, epoch)
+        save_checkpoint(out_dir / "best.pt", model, optimizer, epoch)
 
-        if val_stats.get("cldice", -1.0) > best_cldice:
-            best_cldice = val_stats["cldice"]
-            save_checkpoint(out_dir / "best.pt", model, optimizer, epoch)
+
+        # if val_stats.get("cldice", -1.0) > best_cldice:
+        #     best_cldice = val_stats["cldice"]
+        #     save_checkpoint(out_dir / "best.pt", model, optimizer, epoch)
 
         print(json.dumps(row))
 
