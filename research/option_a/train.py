@@ -131,10 +131,10 @@ def main():
         use_patches=True,
     )
     val_ds = TopCoWMRADataset(
-        args.data_root,
-        split="val",
-        patch_size=tuple(args.patch_size),
-        use_patches=False,
+    args.data_root,
+    split="val",
+    patch_size=tuple(args.patch_size),
+    use_patches=True,
     )
 
     train_loader = DataLoader(
