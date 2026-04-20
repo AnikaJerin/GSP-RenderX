@@ -58,6 +58,13 @@ def endpoint_branchpoint_counts(centerline: np.ndarray) -> tuple[int, int]:
     return endpoints, branchpoints
 
 
+def mae_on_mask(pred: np.ndarray, target: np.ndarray, mask: np.ndarray, eps: float = 1e-5) -> float:
+    mask = mask.astype(bool)
+    if np.count_nonzero(mask) == 0:
+        return 0.0
+    return float(np.abs(pred[mask] - target[mask]).sum() / (np.count_nonzero(mask) + eps))
+
+
 def topology_report(
     pred: np.ndarray,
     target: np.ndarray,
@@ -76,4 +83,36 @@ def topology_report(
         "target_branchpoints": float(target_branch),
         "endpoint_abs_error": float(abs(pred_end - target_end)),
         "branchpoint_abs_error": float(abs(pred_branch - target_branch)),
+    }
+
+
+def structure_report(
+    pred_mask: np.ndarray,
+    target_mask: np.ndarray,
+    pred_centerline: np.ndarray,
+    target_centerline: np.ndarray,
+    pred_branchpoints: np.ndarray,
+    target_branchpoints: np.ndarray,
+    pred_radius: np.ndarray,
+    target_radius: np.ndarray,
+    spacing: tuple[float, float, float] = (1.0, 1.0, 1.0),
+) -> dict[str, float]:
+    base = topology_report(
+        pred_mask,
+        target_mask,
+        spacing=spacing,
+    )
+    pred_end, pred_branch = endpoint_branchpoint_counts(pred_centerline)
+    target_end, target_branch = endpoint_branchpoint_counts(target_centerline)
+    return {
+        **base,
+        "centerline_dice": dice_score(pred_centerline, target_centerline),
+        "branchpoint_dice": dice_score(pred_branchpoints, target_branchpoints),
+        "radius_mae_on_gt_vessel": mae_on_mask(pred_radius, target_radius, target_mask),
+        "pred_branchpoints_direct": float(np.count_nonzero(pred_branchpoints)),
+        "target_branchpoints_direct": float(np.count_nonzero(target_branchpoints)),
+        "pred_endpoints_centerline": float(pred_end),
+        "target_endpoints_centerline": float(target_end),
+        "pred_branchpoints_centerline": float(pred_branch),
+        "target_branchpoints_centerline": float(target_branch),
     }
