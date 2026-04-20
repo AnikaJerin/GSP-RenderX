@@ -23,13 +23,21 @@ def run_inference(model: torch.nn.Module, image_np: np.ndarray, device: torch.de
     outputs = model(image_t)
     seg_prob = torch.sigmoid(outputs["seg_logits"]).squeeze().cpu().numpy().astype(np.float32)
     center_prob = torch.sigmoid(outputs["centerline_logits"]).squeeze().cpu().numpy().astype(np.float32)
+    branch_prob = torch.sigmoid(outputs["branchpoint_logits"]).squeeze().cpu().numpy().astype(np.float32)
+    radius_map = torch.relu(outputs["radius_logits"]).squeeze().cpu().numpy().astype(np.float32)
     vessel_mask = (seg_prob > 0.5).astype(np.uint8)
     center_mask = (center_prob > 0.5).astype(np.uint8)
+    branch_mask = (branch_prob > 0.4).astype(np.uint8)
+
+    structure_uncertainty = 1.0 - np.clip(np.abs(center_prob - branch_prob), 0.0, 1.0)
+    logit_uncertainty = np.clip(1.0 - np.abs(seg_prob - 0.5) * 2.0, 0.0, 1.0)
     return {
         "vessel_prob": seg_prob,
         "vessel_mask": vessel_mask,
         "centerline_mask": center_mask,
-        "uncertainty_map": np.clip(1.0 - np.abs(seg_prob - 0.5) * 2.0, 0.0, 1.0).astype(np.float32),
+        "branchpoint_map": branch_mask,
+        "radius_map": radius_map,
+        "uncertainty_map": np.clip(0.6 * logit_uncertainty + 0.4 * structure_uncertainty, 0.0, 1.0).astype(np.float32),
     }
 
 
@@ -61,9 +69,17 @@ def main():
         vessel_mask=pred["vessel_mask"],
         vessel_prob=pred["vessel_prob"],
         centerline_mask=pred["centerline_mask"],
+        branchpoint_map=pred["branchpoint_map"],
+        radius_map=pred["radius_map"],
         uncertainty_map=pred["uncertainty_map"],
         spacing=spacing,
-        metadata={"checkpoint": args.checkpoint, "image": args.image, "method": "TopologyCenterlineUNet"},
+        metadata={
+            "checkpoint": args.checkpoint,
+            "image": args.image,
+            "method": "TopologyCenterlineUNetV2",
+            "branchpoint_count_pred": int(np.count_nonzero(pred["branchpoint_map"])),
+            "mean_radius_pred": float(np.mean(pred["radius_map"][pred["vessel_mask"] > 0])) if np.count_nonzero(pred["vessel_mask"]) > 0 else 0.0,
+        },
     )
     print(f"Exported {args.out}")
 

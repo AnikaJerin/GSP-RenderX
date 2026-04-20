@@ -5,7 +5,9 @@ import uuid
 import zipfile
 import httpx
 import numpy as np
+from pydantic import BaseModel
 from ..services.pipeline import convert_mesh_to_gaussians, convert_vessel_volume_to_gaussians
+from ..services.prompt_mesh import export_prompt_mesh
 from ..services.generator_registry import list_generators
 from ..services.mesh_loader import load_mesh
 from ..services.model_state import (
@@ -118,6 +120,14 @@ def _persist_upload_to_vessel_volume(file: UploadFile, upload_id_prefix: str = "
     }
 
 
+class TextPromptRequest(BaseModel):
+    prompt: str
+    target_splats: int = 150000
+    edge_angle: float = 35.0
+    edge_oversample: float = 1.5
+    generator: str = "heuristic_mesh"
+
+
 async def _fetch_remote_mesh(image_path: str, mode: str) -> str:
   """
   Send the image to the appropriate remote reconstruction API and save
@@ -165,11 +175,6 @@ async def convert_model(
     persisted = _persist_upload_to_mesh(file)
     mesh_path = persisted["mesh_path"]
 
-    mesh_ext = os.path.splitext(mesh_path)[1].lower()
-    mesh_out = f"{uuid.uuid4().hex}{mesh_ext}"
-    mesh_out_path = os.path.join(STATIC_DIR, mesh_out)
-    shutil.copyfile(mesh_path, mesh_out_path)
-
     try:
         gaussian_data = convert_mesh_to_gaussians(
             mesh_path,
@@ -185,8 +190,39 @@ async def convert_model(
 
     return {
         **gaussian_data,
-        "mesh_url": f"/static/{mesh_out}",
-        "mesh_type": mesh_ext.replace(".", ""),
+        "source_mesh_url": f"/static/{os.path.basename(mesh_path)}" if mesh_path.startswith(STATIC_DIR) else None,
+    }
+
+
+@router.post("/generate_from_text")
+async def generate_from_text(request: TextPromptRequest):
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt must not be empty.")
+
+    try:
+        prompt_mesh = export_prompt_mesh(request.prompt)
+        gaussian_data = convert_mesh_to_gaussians(
+            prompt_mesh["mesh_path"],
+            samples=request.target_splats,
+            edge_angle=request.edge_angle,
+            edge_oversample=request.edge_oversample,
+            generator_name=request.generator,
+        )
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        **gaussian_data,
+        "prompt": request.prompt,
+        "source_mesh_url": prompt_mesh["mesh_url"],
+        "source_mesh_type": prompt_mesh["mesh_type"],
+        "metadata": {
+            **(gaussian_data.get("metadata") or {}),
+            "source_type": "text_prompt",
+            "prompt": request.prompt,
+        },
     }
 
 

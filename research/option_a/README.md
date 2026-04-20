@@ -9,9 +9,12 @@ This folder contains the actual Colab-side research code for the first publishab
 - 3D residual U-Net backbone
 - vessel segmentation head
 - centerline auxiliary head
-- topology-sensitive training loss with `Dice + BCE + centerline BCE + soft clDice`
+- branchpoint head
+- radius head
+- centerline-conditioned fusion before final segmentation
+- topology-sensitive training loss with `Dice + BCE + centerline BCE + branchpoint BCE + radius SmoothL1 + soft clDice`
 
-This is meant to beat a plain vessel-only baseline by improving continuity and centerline quality, especially on small CoW branches.
+This version is meant to move beyond "segmentation plus visualization" by making learned structure drive both the segmentation and the exported Gaussian attributes.
 
 ## Files
 

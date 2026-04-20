@@ -1,5 +1,6 @@
 from .gsp_encoder import write_gsp
 from .generator_registry import GeneratorContext, get_generator
+from .quick_mesh import export_quick_mesh_from_gaussians
 from .vessel_centerline import vessel_volume_to_gaussians
 from .vessel_loader import load_vessel_volume
 import os
@@ -36,12 +37,14 @@ def convert_mesh_to_gaussians(
         gaussian_set.sizes,
         out_path,
     )
+    quick_mesh = export_quick_mesh_from_gaussians(gaussian_set)
 
     return {
         "gsp_url": f"/static/{out_name}",
         "count": int(len(gaussian_set.positions)),
         "generator": generator_name,
         "metadata": gaussian_set.metadata or {},
+        **quick_mesh,
     }
 
 
@@ -68,6 +71,7 @@ def convert_vessel_volume_to_gaussians(
         gaussian_set.sizes,
         out_path,
     )
+    quick_mesh = export_quick_mesh_from_gaussians(gaussian_set)
 
     return {
         "gsp_url": f"/static/{out_name}",
@@ -75,4 +79,5 @@ def convert_vessel_volume_to_gaussians(
         "generator": "vessel_centerline_proxy",
         "metadata": gaussian_set.metadata or {},
         "structural_features": features.as_dict(),
+        **quick_mesh,
     }

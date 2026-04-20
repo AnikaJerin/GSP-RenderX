@@ -55,12 +55,31 @@ def compute_centerline_proxy(mask: np.ndarray, spacing: tuple[float, float, floa
     return centerline.astype(np.uint8)
 
 
+def compute_radius_map(mask: np.ndarray, spacing: tuple[float, float, float]) -> np.ndarray:
+    if np.count_nonzero(mask) == 0:
+        return np.zeros_like(mask, dtype=np.float32)
+    return ndimage.distance_transform_edt(mask.astype(bool), sampling=spacing).astype(np.float32)
+
+
+def compute_branchpoint_map(centerline: np.ndarray) -> np.ndarray:
+    if np.count_nonzero(centerline) == 0:
+        return np.zeros_like(centerline, dtype=np.uint8)
+    kernel = np.ones((3, 3, 3), dtype=np.uint8)
+    neighbors = ndimage.convolve(centerline.astype(np.uint8), kernel, mode="constant")
+    neighbors = neighbors - centerline.astype(np.uint8)
+    branchpoints = (centerline > 0) & (neighbors >= 3)
+    # Mild dilation makes the supervision less brittle than a single-voxel target.
+    return ndimage.binary_dilation(branchpoints, iterations=1).astype(np.uint8)
+
+
 def random_crop_around_mask(
     image: np.ndarray,
     mask: np.ndarray,
     centerline: np.ndarray,
+    radius_map: np.ndarray,
+    branchpoints: np.ndarray,
     patch_size: tuple[int, int, int],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     shape = np.array(image.shape)
     patch = np.array(patch_size)
 
@@ -78,23 +97,35 @@ def random_crop_around_mask(
     img_crop = image[slices]
     mask_crop = mask[slices]
     center_crop = centerline[slices]
+    radius_crop = radius_map[slices]
+    branch_crop = branchpoints[slices]
 
     pad = [(0, max(0, p - c)) for p, c in zip(patch_size, img_crop.shape)]
     if any(x[1] > 0 for x in pad):
         img_crop = np.pad(img_crop, pad, mode="constant")
         mask_crop = np.pad(mask_crop, pad, mode="constant")
         center_crop = np.pad(center_crop, pad, mode="constant")
+        radius_crop = np.pad(radius_crop, pad, mode="constant")
+        branch_crop = np.pad(branch_crop, pad, mode="constant")
 
-    return img_crop, mask_crop, center_crop
+    return img_crop, mask_crop, center_crop, radius_crop, branch_crop
 
 
-def maybe_flip(image: np.ndarray, mask: np.ndarray, centerline: np.ndarray):
+def maybe_flip(
+    image: np.ndarray,
+    mask: np.ndarray,
+    centerline: np.ndarray,
+    radius_map: np.ndarray,
+    branchpoints: np.ndarray,
+):
     for axis in range(3):
         if random.random() < 0.5:
             image = np.flip(image, axis=axis).copy()
             mask = np.flip(mask, axis=axis).copy()
             centerline = np.flip(centerline, axis=axis).copy()
-    return image, mask, centerline
+            radius_map = np.flip(radius_map, axis=axis).copy()
+            branchpoints = np.flip(branchpoints, axis=axis).copy()
+    return image, mask, centerline, radius_map, branchpoints
 
 
 @dataclass
@@ -299,24 +330,38 @@ class TopCoWMRADataset(Dataset):
         vessel_mask = (label > 0).astype(np.uint8)
         spacing = tuple(float(x) for x in image_nii.header.get_zooms()[:3])
         centerline = compute_centerline_proxy(vessel_mask, spacing=spacing)
+        radius_map = compute_radius_map(vessel_mask, spacing=spacing)
+        branchpoints = compute_branchpoint_map(centerline)
 
         if self.use_patches and self.split == "train":
-            image, vessel_mask, centerline = random_crop_around_mask(
+            image, vessel_mask, centerline, radius_map, branchpoints = random_crop_around_mask(
                 image,
                 vessel_mask,
                 centerline,
+                radius_map,
+                branchpoints,
                 patch_size=self.patch_size,
             )
-            image, vessel_mask, centerline = maybe_flip(image, vessel_mask, centerline)
+            image, vessel_mask, centerline, radius_map, branchpoints = maybe_flip(
+                image,
+                vessel_mask,
+                centerline,
+                radius_map,
+                branchpoints,
+            )
 
         image_t = torch.from_numpy(image[None, ...].astype(np.float32))
         vessel_t = torch.from_numpy(vessel_mask[None, ...].astype(np.float32))
         center_t = torch.from_numpy(centerline[None, ...].astype(np.float32))
+        radius_t = torch.from_numpy(radius_map[None, ...].astype(np.float32))
+        branch_t = torch.from_numpy(branchpoints[None, ...].astype(np.float32))
 
         return {
             "image": image_t,
             "mask": vessel_t,
             "centerline": center_t,
+            "radius_map": radius_t,
+            "branchpoints": branch_t,
             "case_id": case.case_id,
             "spacing": torch.tensor(spacing, dtype=torch.float32),
             "image_path": str(case.image_path),

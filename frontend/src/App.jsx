@@ -9,6 +9,7 @@ import {
   enableDynamics,
   updateRenderingSettings,
   updateDynamicsSettings,
+  updateOverlaySettings,
 } from "./core/scene/SceneModel";
 import "./App.css";
 
@@ -184,6 +185,10 @@ export default function App() {
               }}
               onUpdateSceneDynamics={(partial) => {
                 setScene((prev) => updateDynamicsSettings(prev, partial));
+              }}
+              sceneOverlays={scene?.settings?.overlays}
+              onUpdateSceneOverlays={(partial) => {
+                setScene((prev) => updateOverlaySettings(prev, partial));
               }}
             />
           </div>

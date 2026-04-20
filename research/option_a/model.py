@@ -51,9 +51,13 @@ class UpBlock(nn.Module):
 
 class TopologyCenterlineUNet(nn.Module):
     """
-    Dual-head 3D U-Net:
+    Structure-aware 3D U-Net:
     - vessel segmentation head
-    - centerline head for topology-sensitive auxiliary supervision
+    - centerline head
+    - branchpoint head
+    - radius head
+    The centerline stream is fused back into the segmentation path so topology
+    is used as a conditioning signal rather than only as an auxiliary output.
     """
 
     def __init__(self, in_channels: int = 1, base_channels: int = 24):
@@ -71,13 +75,31 @@ class TopologyCenterlineUNet(nn.Module):
         self.up1 = UpBlock(c * 4, c * 2, c * 2)
         self.up0 = UpBlock(c * 2, c, c)
 
-        self.seg_head = nn.Conv3d(c, 1, kernel_size=1)
         self.centerline_head = nn.Sequential(
             nn.Conv3d(c, c, kernel_size=3, padding=1),
             nn.InstanceNorm3d(c),
             nn.LeakyReLU(0.01, inplace=True),
             nn.Conv3d(c, 1, kernel_size=1),
         )
+        self.branchpoint_head = nn.Sequential(
+            nn.Conv3d(c, c, kernel_size=3, padding=1),
+            nn.InstanceNorm3d(c),
+            nn.LeakyReLU(0.01, inplace=True),
+            nn.Conv3d(c, 1, kernel_size=1),
+        )
+        self.radius_head = nn.Sequential(
+            nn.Conv3d(c, c, kernel_size=3, padding=1),
+            nn.InstanceNorm3d(c),
+            nn.LeakyReLU(0.01, inplace=True),
+            nn.Conv3d(c, 1, kernel_size=1),
+        )
+        self.centerline_fuser = nn.Sequential(
+            nn.Conv3d(c + 2, c, kernel_size=3, padding=1),
+            nn.InstanceNorm3d(c),
+            nn.LeakyReLU(0.01, inplace=True),
+            ResBlock3D(c, c),
+        )
+        self.seg_head = nn.Conv3d(c, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         s0 = self.stem(x)
@@ -91,7 +113,23 @@ class TopologyCenterlineUNet(nn.Module):
         x = self.up1(x, s1)
         x = self.up0(x, s0)
 
+        centerline_logits = self.centerline_head(x)
+        branchpoint_logits = self.branchpoint_head(x)
+        radius_logits = self.radius_head(x)
+
+        structure_features = torch.cat(
+            [
+                x,
+                torch.sigmoid(centerline_logits),
+                torch.sigmoid(branchpoint_logits),
+            ],
+            dim=1,
+        )
+        fused = self.centerline_fuser(structure_features)
+
         return {
-            "seg_logits": self.seg_head(x),
-            "centerline_logits": self.centerline_head(x),
+            "seg_logits": self.seg_head(fused),
+            "centerline_logits": centerline_logits,
+            "branchpoint_logits": branchpoint_logits,
+            "radius_logits": radius_logits,
         }

@@ -39,6 +39,8 @@ export default function InfoPanel({
   onUpdateSceneRendering,
   onToggleSceneDynamics,
   onUpdateSceneDynamics,
+  sceneOverlays,
+  onUpdateSceneOverlays,
 }) {
   const count = data?.count || (data?.positions ? data.positions.length / 3 : 0);
   const bboxMin = data?.bboxMin;
@@ -220,24 +222,90 @@ export default function InfoPanel({
               : "Enable Dynamics"}
           </button>
           {sceneDynamics && sceneDynamics.enabled && (
-            <div className="control-row">
-              <label>
-                Temporal Time
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="0.01"
-                  value={
-                    sceneDynamics.time != null ? sceneDynamics.time : 0
-                  }
-                  onChange={(e) =>
-                    onUpdateSceneDynamics({ time: Number(e.target.value) })
-                  }
-                />
-              </label>
-            </div>
+            <>
+              <div className="control-row">
+                <label>
+                  Dynamics Mode
+                  <select
+                    value={sceneDynamics.mode || "gravity"}
+                    onChange={(e) =>
+                      onUpdateSceneDynamics({ mode: e.target.value })
+                    }
+                  >
+                    <option value="gravity">Gravity</option>
+                    <option value="orbit">Orbit</option>
+                    <option value="oscillate">Oscillate</option>
+                    <option value="none">None</option>
+                  </select>
+                </label>
+              </div>
+              <div className="control-row">
+                <label>
+                  Temporal Time
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="0.01"
+                    value={
+                      sceneDynamics.time != null ? sceneDynamics.time : 0
+                    }
+                    onChange={(e) =>
+                      onUpdateSceneDynamics({ time: Number(e.target.value) })
+                    }
+                  />
+                </label>
+              </div>
+              {sceneDynamics.mode === "gravity" && (
+                <>
+                  <div className="control-row">
+                    <label>
+                      Gravity Strength
+                      <input
+                        type="range"
+                        min="0"
+                        max="0.8"
+                        step="0.01"
+                        value={sceneDynamics.gravityStrength ?? 0.2}
+                        onChange={(e) =>
+                          onUpdateSceneDynamics({
+                            gravityStrength: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="control-row">
+                    <label>
+                      Bounce
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={sceneDynamics.bounce ?? 0.35}
+                        onChange={(e) =>
+                          onUpdateSceneDynamics({ bounce: Number(e.target.value) })
+                        }
+                      />
+                    </label>
+                  </div>
+                </>
+              )}
+            </>
           )}
+          <button
+            className="button-secondary"
+            onClick={() =>
+              onUpdateSceneOverlays({
+                showStickFigure: !sceneOverlays?.showStickFigure,
+              })
+            }
+          >
+            {sceneOverlays?.showStickFigure
+              ? "Hide Stick Figure"
+              : "Show Stick Figure"}
+          </button>
         </>
       )}
 

@@ -10,6 +10,7 @@ def save_vessel_bundle(
     vessel_mask: np.ndarray | None = None,
     vessel_prob: np.ndarray | None = None,
     centerline_mask: np.ndarray | None = None,
+    branchpoint_map: np.ndarray | None = None,
     radius_map: np.ndarray | None = None,
     uncertainty_map: np.ndarray | None = None,
     spacing: tuple[float, float, float] | list[float] | np.ndarray | None = None,
@@ -31,6 +32,8 @@ def save_vessel_bundle(
         payload["vessel_prob"] = np.asarray(vessel_prob, dtype=np.float32)
     if centerline_mask is not None:
         payload["centerline_mask"] = np.asarray(centerline_mask)
+    if branchpoint_map is not None:
+        payload["branchpoint_map"] = np.asarray(branchpoint_map)
     if radius_map is not None:
         payload["radius_map"] = np.asarray(radius_map, dtype=np.float32)
     if uncertainty_map is not None:

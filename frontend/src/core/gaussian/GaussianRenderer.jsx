@@ -26,16 +26,39 @@ const vertexShader = `
   uniform float uClipEnabled;
   uniform float uClipAxis;
   uniform float uClipValue;
+  uniform float uPhysicsEnabled;
+  uniform float uPhysicsTime;
+  uniform float uGravityStrength;
+  uniform float uBounce;
+  uniform float uFloorY;
+  uniform float uStiffness;
+  uniform float uBBoxMinY;
+  uniform float uBBoxHeight;
 
   void main() {
       vColor = color;     // provided by Three.js
       vNormal = normalMatrix * normal;   // view-space normal
       vSize = size;
 
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vec3 localPos = position;
+      if (uPhysicsEnabled > 0.5) {
+        float normalizedHeight = clamp((position.y - uBBoxMinY) / max(uBBoxHeight, 0.0001), 0.0, 1.0);
+        float delayedTime = max(uPhysicsTime - normalizedHeight * 0.45, 0.0);
+        float gravityDrop = 0.5 * 9.8 * delayedTime * delayedTime * uGravityStrength;
+        float displacedY = position.y - gravityDrop;
+        float floorY = uFloorY + normalizedHeight * uStiffness * uBBoxHeight * 0.12;
+        if (displacedY < floorY) {
+          float impactTime = max(delayedTime - sqrt(max((position.y - floorY) * 2.0 / max(9.8 * uGravityStrength, 0.0001), 0.0)), 0.0);
+          float rebound = sin(impactTime * 12.0) * exp(-impactTime * 5.0) * uBounce * max(uBBoxHeight, 0.0001);
+          displacedY = floorY + max(rebound, 0.0);
+        }
+        localPos.y = displacedY;
+      }
+
+      vec4 mvPosition = modelViewMatrix * vec4(localPos, 1.0);
       vDepth = -mvPosition.z;
       vViewDir = normalize(-mvPosition.xyz);
-      vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+      vWorldPos = (modelMatrix * vec4(localPos, 1.0)).xyz;
       float screenScale = uViewportHeight / 800.0;
       float viewDepth = max(-mvPosition.z, 0.001);
       float densityScale = mix(1.0, uDensityBoost, clamp(1.0 - (size / uSizeRef), 0.0, 1.0));
@@ -102,6 +125,10 @@ export default function GaussianRenderer({
   annotations = [],
   showAnnotations = true,
   globalOpacity = 1.0,
+  physics = null,
+  physicsEnabled = false,
+  bboxMin = null,
+  bboxMax = null,
 }) {
   const pointsRef = useRef(null);
 
@@ -164,6 +191,14 @@ export default function GaussianRenderer({
           uClipEnabled: { value: 0.0 },
           uClipAxis: { value: 1.0 },
           uClipValue: { value: 0.0 },
+          uPhysicsEnabled: { value: 0.0 },
+          uPhysicsTime: { value: 0.0 },
+          uGravityStrength: { value: 0.2 },
+          uBounce: { value: 0.35 },
+          uFloorY: { value: 0.0 },
+          uStiffness: { value: 0.22 },
+          uBBoxMinY: { value: -0.5 },
+          uBBoxHeight: { value: 1.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
           uGlobalOpacity: { value: 1.0 },
@@ -196,6 +231,14 @@ export default function GaussianRenderer({
           uClipEnabled: { value: 0.0 },
           uClipAxis: { value: 1.0 },
           uClipValue: { value: 0.0 },
+          uPhysicsEnabled: { value: 0.0 },
+          uPhysicsTime: { value: 0.0 },
+          uGravityStrength: { value: 0.2 },
+          uBounce: { value: 0.35 },
+          uFloorY: { value: 0.0 },
+          uStiffness: { value: 0.22 },
+          uBBoxMinY: { value: -0.5 },
+          uBBoxHeight: { value: 1.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
           uGlobalOpacity: { value: 1.0 },
@@ -228,6 +271,14 @@ export default function GaussianRenderer({
           uClipEnabled: { value: 0.0 },
           uClipAxis: { value: 1.0 },
           uClipValue: { value: 0.0 },
+          uPhysicsEnabled: { value: 0.0 },
+          uPhysicsTime: { value: 0.0 },
+          uGravityStrength: { value: 0.2 },
+          uBounce: { value: 0.35 },
+          uFloorY: { value: 0.0 },
+          uStiffness: { value: 0.22 },
+          uBBoxMinY: { value: -0.5 },
+          uBBoxHeight: { value: 1.0 },
           uMono: { value: 0.0 },
           uMonoColor: { value: new THREE.Color(0.86, 0.86, 0.86) },
           uGlobalOpacity: { value: 1.0 },
@@ -273,10 +324,23 @@ export default function GaussianRenderer({
     materialEdge.uniforms.uEdgeBoost.value = 3.0 * edgeFillBoost;
     const axisValue = clipAxis === "x" ? 0.0 : clipAxis === "y" ? 1.0 : 2.0;
     const clipOn = clipEnabled ? 1.0 : 0.0;
+    const boundsMinY = bboxMin?.[1] ?? -0.5;
+    const boundsMaxY = bboxMax?.[1] ?? 0.5;
+    const boundsHeight = Math.max(boundsMaxY - boundsMinY, 0.0001);
+    const physicsTime = physics?.time != null ? physics.time : 0.0;
+    const floorY = boundsMinY + (physics?.floorOffset ?? 0.02);
     [materialFill, materialDetail, materialEdge].forEach((mat) => {
       mat.uniforms.uClipEnabled.value = clipOn;
       mat.uniforms.uClipAxis.value = axisValue;
       mat.uniforms.uClipValue.value = clipValue;
+      mat.uniforms.uPhysicsEnabled.value = physicsEnabled ? 1.0 : 0.0;
+      mat.uniforms.uPhysicsTime.value = physicsTime;
+      mat.uniforms.uGravityStrength.value = physics?.gravityStrength ?? 0.2;
+      mat.uniforms.uBounce.value = physics?.bounce ?? 0.35;
+      mat.uniforms.uFloorY.value = floorY;
+      mat.uniforms.uStiffness.value = physics?.stiffness ?? 0.22;
+      mat.uniforms.uBBoxMinY.value = boundsMinY;
+      mat.uniforms.uBBoxHeight.value = boundsHeight;
     });
   }, [
     materialFill,
@@ -290,6 +354,10 @@ export default function GaussianRenderer({
     clipAxis,
     clipValue,
     globalOpacity,
+    physicsEnabled,
+    physics,
+    bboxMin,
+    bboxMax,
   ]);
 
   useFrame(({ clock }) => {

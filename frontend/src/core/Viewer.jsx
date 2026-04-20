@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 import GaussianRenderer from "./gaussian/GaussianRenderer";
 import MeshSurface from "./mesh/MeshSurface";
 import BackgroundGrid from "./BackgroundGrid";
@@ -41,6 +42,52 @@ function RaycastConfig() {
     raycaster.params.Points.threshold = 0.15;
   }, [raycaster]);
   return null;
+}
+
+function StickFigureOverlay({ figure, overlays, dynamicsEnabled }) {
+  const lineGeometry = useMemo(() => {
+    if (!figure?.nodes || !figure?.connectivity) return null;
+    const nodeMap = new Map(figure.nodes.map((node) => [node.id, node.position]));
+    const positions = [];
+    figure.connectivity.forEach(({ from, to }) => {
+      const start = nodeMap.get(from);
+      const end = nodeMap.get(to);
+      if (!start || !end) return;
+      positions.push(...start, ...end);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(positions), 3)
+    );
+    return geometry;
+  }, [figure]);
+
+  if (!figure?.nodes?.length || !lineGeometry) return null;
+
+  const nodeRadius = overlays?.nodeScale ?? 0.022;
+  const opacity = overlays?.lineOpacity ?? 0.92;
+  const color = dynamicsEnabled ? "#ffd166" : "#8af8c3";
+
+  return (
+    <group>
+      <lineSegments geometry={lineGeometry} renderOrder={4}>
+        <lineBasicMaterial color={color} transparent opacity={opacity} />
+      </lineSegments>
+      {figure.nodes.map((node) => (
+        <mesh key={node.id} position={node.position} renderOrder={5}>
+          <sphereGeometry args={[nodeRadius, 14, 14]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.25}
+            roughness={0.35}
+            metalness={0.05}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
 }
 
 function decimateData(data, maxPoints) {
@@ -221,6 +268,24 @@ export default function Viewer({
     return scene.settings.rendering;
   }, [sceneEnabled, scene]);
 
+  const sceneDynamics = useReactMemo(() => {
+    if (!sceneEnabled || !scene?.settings?.dynamics) return null;
+    return scene.settings.dynamics;
+  }, [sceneEnabled, scene]);
+
+  const stickFigure = useReactMemo(() => {
+    if (!sceneEnabled || !scene?.entities?.length) return null;
+    return (
+      scene.entities.find((entity) => entity.components?.stickFigure)?.components
+        ?.stickFigure || null
+    );
+  }, [sceneEnabled, scene]);
+
+  const overlaySettings = useReactMemo(() => {
+    if (!sceneEnabled || !scene?.settings?.overlays) return null;
+    return scene.settings.overlays;
+  }, [sceneEnabled, scene]);
+
   // Scene Engine: dynamic transform & simple animation wrapper.
   function SceneEntityGroup({ children }) {
     const groupRef = useRef();
@@ -232,11 +297,16 @@ export default function Viewer({
       const t = dyn.time != null ? dyn.time : clockT;
       if (!groupRef.current) return;
 
-      // Simple demo animation: slow orbit + subtle vertical motion.
-      const orbitSpeed = 0.2;
-      const bounceAmp = 0.08;
-      groupRef.current.rotation.y = t * orbitSpeed;
-      groupRef.current.position.y = Math.sin(t * 1.2) * bounceAmp;
+      if (dyn.mode === "orbit") {
+        groupRef.current.rotation.y = t * 0.2;
+        groupRef.current.position.y = Math.sin(t * 1.2) * 0.08;
+      } else if (dyn.mode === "oscillate") {
+        groupRef.current.rotation.y = Math.sin(t * 0.7) * 0.16;
+        groupRef.current.position.y = Math.sin(t * 1.8) * 0.05;
+      } else {
+        groupRef.current.rotation.y = 0;
+        groupRef.current.position.y = 0;
+      }
     });
     return <group ref={groupRef}>{children}</group>;
   }
@@ -279,6 +349,12 @@ export default function Viewer({
                   ? sceneRenderOverrides.splatVisibility
                   : 1.0
               }
+              physics={sceneDynamics}
+              physicsEnabled={
+                Boolean(sceneDynamics?.enabled) && sceneDynamics?.mode === "gravity"
+              }
+              bboxMin={data?.bboxMin}
+              bboxMax={data?.bboxMax}
             />
           </SceneEntityGroup>
         )}
@@ -302,6 +378,13 @@ export default function Viewer({
             bboxMin={data.bboxMin}
             bboxMax={data.bboxMax}
             controlsRef={controlsRef}
+          />
+        )}
+        {sceneEnabled && overlaySettings?.showStickFigure && stickFigure && (
+          <StickFigureOverlay
+            figure={stickFigure}
+            overlays={overlaySettings}
+            dynamicsEnabled={Boolean(sceneDynamics?.enabled)}
           />
         )}
         <AdaptiveBudget />

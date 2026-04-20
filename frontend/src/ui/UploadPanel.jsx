@@ -4,6 +4,8 @@ import { loadGSPProgressive } from "../core/loaders/GSPLoader";
 const API_ROOT = "http://127.0.0.1:8000";
 
 export default function UploadPanel({ onFileUpload, onVesselAnalyze }) {
+  const [textPrompt, setTextPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [targetSplats, setTargetSplats] = useState(150000);
   const [edgeAngle, setEdgeAngle] = useState(35);
@@ -115,6 +117,43 @@ export default function UploadPanel({ onFileUpload, onVesselAnalyze }) {
       alert(err.message || "Upload failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePromptGenerate = async () => {
+    if (!textPrompt.trim()) {
+      alert("Please enter a text prompt first");
+      return;
+    }
+
+    setPromptLoading(true);
+    try {
+      const res = await fetch(`${API_ROOT}/generate_from_text`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: textPrompt.trim(),
+          target_splats: targetSplats,
+          edge_angle: edgeAngle,
+          edge_oversample: 1.5,
+          generator: "heuristic_mesh",
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Prompt generation failed");
+      }
+
+      const result = await res.json();
+      await streamGspResult(result);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Prompt generation failed");
+    } finally {
+      setPromptLoading(false);
     }
   };
 
@@ -237,6 +276,31 @@ export default function UploadPanel({ onFileUpload, onVesselAnalyze }) {
         Mesh conversion stays local here. For Option A, train the vessel model in Colab,
         export `.npy/.npz`, and inspect the centerline-aware output in this app.
       </div>
+
+      <div className="panel-section-title">Text to 3D</div>
+      <div className="panel-sub">
+        Describe a simple object and generate a local 3D proxy, Gaussian splats, and a quick mesh reconstructed from those splats.
+      </div>
+      <div className="control-row">
+        <label>
+          Text prompt
+          <textarea
+            rows="3"
+            value={textPrompt}
+            onChange={(e) => setTextPrompt(e.target.value)}
+            placeholder="Examples: tall rocket, wooden chair, wide table, snowman"
+          />
+        </label>
+      </div>
+      <button
+        className="button-primary"
+        onClick={handlePromptGenerate}
+        disabled={promptLoading}
+      >
+        {promptLoading ? "Generating 3D Object..." : "Generate 3D from Text"}
+      </button>
+
+      <hr className="panel-separator" />
 
       <div className="panel-section-title">Mesh to GSP</div>
       <label className="file-drop">
